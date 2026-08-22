@@ -1,0 +1,83 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Importar</h1>
+      <p class="subtitle">
+        Trae tu histórico desde Excel o CSV. Cada importación sobrescribe por
+        completo gastos, ingresos e inversiones en todas las pantallas.
+      </p>
+    </div>
+  </header>
+
+  <div
+    class="dropzone"
+    [class.active]="dragOver()"
+    [class.busy]="busy()"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave()"
+    (drop)="onDrop($event)"
+  >
+    <mat-icon>upload_file</mat-icon>
+    <p class="dz-title">Arrastra aquí tu archivo</p>
+    <p class="dz-copy">.xlsx · .xls · .csv</p>
+    <label class="btn-primary file-btn">
+      Elegir archivo
+      <input
+        type="file"
+        accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+        hidden
+        (change)="onFileInput($event)"
+      />
+    </label>
+  </div>
+
+  <section class="hints">
+    <h2>Columnas reconocidas</h2>
+    <ul>
+      <li>
+        <strong>Gastos / Ingresos / Transacciones:</strong> fecha, importe,
+        descripción, categoría (se clasifican automáticamente)
+      </li>
+      <li>
+        <strong>Bolsa:</strong> empresa, fecha, inversión (negativa = venta),
+        precio compra, precio venta, comisión, nº acciones
+      </li>
+    </ul>
+    <p>
+      Las hojas llamadas «Resumen» se ignoran. Las categorías deben coincidir con
+      las de la app (o aliases habituales).
+    </p>
+  </section>
+
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+
+  @if (result(); as r) {
+    <section class="result">
+      <h2>Resultado{{ fileName() ? ' — ' + fileName() : '' }}</h2>
+      <div class="counts">
+        <div><span>Gastos</span><strong>{{ r.gastos }}</strong></div>
+        <div><span>Ingresos</span><strong>{{ r.ingresos }}</strong></div>
+        <div><span>Operaciones</span><strong>{{ r.operaciones }}</strong></div>
+        <div><span>Avisos</span><strong>{{ r.issues.length }}</strong></div>
+      </div>
+      @if (r.issues.length) {
+        <ul class="issues">
+          @for (issue of r.issues.slice(0, 40); track $index) {
+            <li>
+              <strong>{{ issue.sheet }}</strong>
+              @if (issue.row) {
+                · fila {{ issue.row }}
+              }
+              — {{ issue.message }}
+            </li>
+          }
+          @if (r.issues.length > 40) {
+            <li>… y {{ r.issues.length - 40 }} más</li>
+          }
+        </ul>
+      }
+    </section>
+  }
+</div>

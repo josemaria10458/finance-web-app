@@ -1,0 +1,88 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Resumen</h1>
+      <p class="subtitle">
+        Cruce en tiempo real de gastos, ingresos e inversiones.
+      </p>
+    </div>
+    <div class="range" role="group" aria-label="Rango temporal">
+      @for (r of rangos; track r.id) {
+        <button
+          type="button"
+          class="range-btn"
+          [class.active]="rango() === r.id"
+          (click)="setRango(r.id)"
+        >
+          {{ r.label }}
+        </button>
+      }
+    </div>
+  </header>
+
+  @if (!hasData()) {
+    <div class="empty">
+      <p class="empty-title">Todavía no hay datos</p>
+      <p class="empty-copy">
+        Añade movimientos o importa tu Excel para ver el dashboard.
+      </p>
+    </div>
+  } @else {
+    <section class="kpi-grid" aria-label="Indicadores">
+      <div class="kpi hero">
+        <span>Patrimonio total</span>
+        <strong>{{ kpis().patrimonio | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</strong>
+      </div>
+      <div class="kpi">
+        <span>Ahorro del periodo</span>
+        <strong [class.neg]="kpis().ahorroNeto < 0">
+          {{ kpis().ahorroNeto | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+        </strong>
+      </div>
+      <div class="kpi">
+        <span>% ahorro</span>
+        <strong>{{ kpis().porcentajeAhorro | percent: '1.0-1' : 'es' }}</strong>
+      </div>
+      <div class="kpi">
+        <span>Rentabilidad YTD</span>
+        <strong>
+          @if (kpis().rentabilidadYtd !== null) {
+            {{ kpis().rentabilidadYtd! | percent: '1.1-2' : 'es' }}
+          } @else {
+            —
+          }
+        </strong>
+      </div>
+    </section>
+
+    <div class="charts">
+      <app-chart-panel
+        title="Ingresos vs gastos"
+        type="bar"
+        [config]="ingresosGastosData()"
+      />
+      <app-chart-panel
+        title="Ahorro acumulado y %"
+        type="line"
+        [config]="ahorroData()"
+        [options]="ahorroOptions"
+      />
+      <app-chart-panel
+        title="Gastos por categoría"
+        type="doughnut"
+        [config]="donutData()"
+      />
+      <app-chart-panel
+        title="Inversión y patrimonio"
+        type="line"
+        [config]="patrimonioData()"
+      />
+      <app-chart-panel
+        class="wide"
+        title="Resultado mensual de inversiones"
+        type="bar"
+        [config]="rentabData()"
+      />
+    </div>
+  }
+</div>

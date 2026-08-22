@@ -1,0 +1,265 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Inversiones</h1>
+      <p class="subtitle">Histórico completo y ventas del Excel con rentabilidad.</p>
+    </div>
+    <div class="header-actions">
+      <button
+        class="btn-danger-outline"
+        type="button"
+        [disabled]="totalOps() === 0"
+        (click)="confirmarBorrarTodas()"
+      >
+        <mat-icon>delete_sweep</mat-icon>
+        Borrar todas
+      </button>
+      <button class="btn-primary" type="button" (click)="abrirCompra()">
+        <mat-icon>add</mat-icon>
+        Nueva compra
+      </button>
+    </div>
+  </header>
+
+  <section class="kpis" aria-label="Resumen de cartera">
+    <div class="kpi main">
+      <span>Capital invertido (abierto)</span>
+      <strong>{{ capitalAbierto() | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</strong>
+    </div>
+    <div class="kpi">
+      <span>Resultado ventas</span>
+      <strong
+        [class.gain]="resultadoVentas() > 0"
+        [class.loss]="resultadoVentas() < 0"
+      >
+        {{ resultadoVentas() | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+      </strong>
+    </div>
+    <div class="kpi">
+      <span>XIRR cartera</span>
+      <strong>
+        @if (xirr() !== null) {
+          {{ xirr()! | percent: '1.1-2' : 'es' }}
+        } @else {
+          —
+        }
+      </strong>
+    </div>
+  </section>
+
+  <div class="toolbar">
+    <div class="tabs" role="tablist" aria-label="Vistas">
+      <button
+        type="button"
+        role="tab"
+        class="tab"
+        [class.active]="vista() === 'historico'"
+        [attr.aria-selected]="vista() === 'historico'"
+        (click)="setVista('historico')"
+      >
+        Histórico
+        <em>{{ historico().length }}</em>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="tab"
+        [class.active]="vista() === 'ventas'"
+        [attr.aria-selected]="vista() === 'ventas'"
+        (click)="setVista('ventas')"
+      >
+        Ventas
+        <em>{{ ventas().length }}</em>
+      </button>
+    </div>
+
+    <div class="sort" role="group" aria-label="Ordenar">
+      <button
+        type="button"
+        class="sort-btn"
+        [class.active]="ordenCampo() === 'fecha'"
+        (click)="ordenarPor('fecha')"
+      >
+        Fecha
+        @if (ordenCampo() === 'fecha') {
+          <mat-icon>{{ ordenDir() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+        }
+      </button>
+      <button
+        type="button"
+        class="sort-btn"
+        [class.active]="ordenCampo() === 'importe'"
+        (click)="ordenarPor('importe')"
+      >
+        Cantidad
+        @if (ordenCampo() === 'importe') {
+          <mat-icon>{{ ordenDir() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+        }
+      </button>
+    </div>
+  </div>
+
+  @if (vista() === 'historico') {
+    @if (historico().length === 0) {
+      <div class="empty">
+        <p class="empty-title">Sin operaciones</p>
+        <p class="empty-copy">Importa el Excel o registra una compra.</p>
+        <button class="btn-primary" type="button" (click)="abrirCompra()">
+          Nueva compra
+        </button>
+      </div>
+    } @else {
+      <ul class="list">
+        @for (op of historico(); track op.id; let i = $index) {
+          <li class="row" [style.animation-delay]="i * 35 + 'ms'">
+            <div class="row-body">
+              <div class="row-top">
+                <span class="desc">
+                  {{ op.empresa }}
+                  <em class="badge" [class.venta]="op.esVenta">{{ op.esVenta ? 'Venta' : 'Compra' }}</em>
+                </span>
+                <span
+                  class="amount"
+                  [class.gain]="op.esVenta && op.resultadoNeto >= 0"
+                  [class.loss]="op.esVenta && op.resultadoNeto < 0"
+                >
+                  @if (op.esVenta) {
+                    {{ op.resultadoNeto | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+                  } @else {
+                    {{ coste(op) | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+                  }
+                </span>
+              </div>
+              <div class="row-meta">
+                <span>{{ fechaRef(op) | date: 'dd/MM/yyyy' }}</span>
+                <span class="sep">·</span>
+                <span>{{ op.numeroAcciones | number: '1.0-4' }} acc.</span>
+                @if (op.esVenta) {
+                  <span class="sep">·</span>
+                  <span
+                    class="rent"
+                    [class.gain]="op.rentabilidadPct >= 0"
+                    [class.loss]="op.rentabilidadPct < 0"
+                  >
+                    {{ op.rentabilidadPct | number: '1.2-2' }} %
+                  </span>
+                }
+              </div>
+              <div class="prices">
+                <div>
+                  <span>Precio compra</span>
+                  <strong>{{ op.precioCompraAccion | currency: 'EUR' : 'symbol' : '1.2-4' : 'es' }}</strong>
+                </div>
+                @if (op.precioVentaAccion != null) {
+                  <div>
+                    <span>Precio venta</span>
+                    <strong>{{ op.precioVentaAccion | currency: 'EUR' : 'symbol' : '1.2-4' : 'es' }}</strong>
+                  </div>
+                }
+                @if (op.esVenta) {
+                  <div>
+                    <span>Rentabilidad</span>
+                    <strong
+                      [class.gain]="op.rentabilidadPct >= 0"
+                      [class.loss]="op.rentabilidadPct < 0"
+                    >
+                      {{ op.rentabilidadPct | number: '1.2-2' }} %
+                    </strong>
+                  </div>
+                }
+              </div>
+              <div class="row-actions">
+                @if (!op.esVenta && op.precioVentaAccion == null) {
+                  <button type="button" class="btn-ghost" (click)="abrirCompra(op)">
+                    Editar
+                  </button>
+                }
+                <button
+                  type="button"
+                  class="btn-ghost danger"
+                  (click)="confirmarBorrar(op)"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    @if (ventas().length === 0) {
+      <div class="empty">
+        <p class="empty-title">Sin ventas</p>
+        <p class="empty-copy">
+          Aquí aparecen las filas del Excel con Inversión negativa.
+        </p>
+      </div>
+    } @else {
+      <ul class="list">
+        @for (op of ventas(); track op.id; let i = $index) {
+          <li
+            class="row venta-card"
+            [class.venta-gain]="op.rentabilidadPct >= 0"
+            [class.venta-loss]="op.rentabilidadPct < 0"
+            [style.animation-delay]="i * 35 + 'ms'"
+          >
+            <div class="row-body">
+              <div class="row-top">
+                <span class="desc">{{ op.empresa }}</span>
+                <span
+                  class="amount"
+                  [class.gain]="op.resultadoNeto >= 0"
+                  [class.loss]="op.resultadoNeto < 0"
+                >
+                  {{ op.resultadoNeto | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+                </span>
+              </div>
+              <div class="row-meta">
+                <span>{{ (op.fechaVenta || op.fechaOperacion) | date: 'dd/MM/yyyy' }}</span>
+                <span class="sep">·</span>
+                <span>{{ op.numeroAcciones | number: '1.0-4' }} acc.</span>
+                <span class="sep">·</span>
+                <span
+                  class="rent"
+                  [class.gain]="op.rentabilidadPct >= 0"
+                  [class.loss]="op.rentabilidadPct < 0"
+                >
+                  {{ op.rentabilidadPct | number: '1.2-2' }} %
+                </span>
+              </div>
+              <div class="prices">
+                <div>
+                  <span>Precio compra</span>
+                  <strong>{{ op.precioCompraAccion | currency: 'EUR' : 'symbol' : '1.2-4' : 'es' }}</strong>
+                </div>
+                <div>
+                  <span>Precio venta</span>
+                  <strong>{{ op.precioVentaAccion | currency: 'EUR' : 'symbol' : '1.2-4' : 'es' }}</strong>
+                </div>
+                <div>
+                  <span>Rentabilidad</span>
+                  <strong
+                    [class.gain]="op.rentabilidadPct >= 0"
+                    [class.loss]="op.rentabilidadPct < 0"
+                  >
+                    {{ op.rentabilidadPct | number: '1.2-2' }} %
+                  </strong>
+                </div>
+              </div>
+              <div class="row-actions">
+                <button
+                  type="button"
+                  class="btn-ghost danger"
+                  (click)="confirmarBorrar(op)"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  }
+</div>

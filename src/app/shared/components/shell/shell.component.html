@@ -1,0 +1,91 @@
+<div class="shell" [class.is-mobile]="(isHandset$ | async) === true">
+  <aside class="rail" [class.open]="railOpen() || (isHandset$ | async) === false">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div class="brand-copy">
+        <span class="brand-text">Finanzas</span>
+        <span class="brand-tag">control personal</span>
+      </div>
+    </div>
+
+    <nav class="rail-nav" aria-label="Secciones">
+      @for (item of navItems; track item.path) {
+        <a
+          class="rail-link"
+          [routerLink]="item.path"
+          routerLinkActive="active"
+          (click)="closeRailOnMobile()"
+        >
+          <mat-icon>{{ item.icon }}</mat-icon>
+          <span>{{ item.label }}</span>
+        </a>
+      }
+    </nav>
+
+    <a
+      class="rail-link secondary"
+      routerLink="/importar"
+      routerLinkActive="active"
+      (click)="closeRailOnMobile()"
+    >
+      <mat-icon>upload_file</mat-icon>
+      <span>Importar</span>
+    </a>
+
+    <button type="button" class="rail-cta" (click)="abrirQuickAdd()">
+      <mat-icon>add</mat-icon>
+      Añadir transacción
+    </button>
+  </aside>
+
+  @if (railOpen() && (isHandset$ | async)) {
+    <button
+      type="button"
+      class="scrim"
+      aria-label="Cerrar menú"
+      (click)="railOpen.set(false)"
+    ></button>
+  }
+
+  <div class="stage">
+    <header class="topbar">
+      @if (isHandset$ | async) {
+        <button
+          type="button"
+          class="icon-btn"
+          aria-label="Abrir menú"
+          (click)="railOpen.set(true)"
+        >
+          <mat-icon>menu</mat-icon>
+        </button>
+        <span class="topbar-brand brand-text">Finanzas</span>
+      } @else {
+        <p class="topbar-note">Tu dinero, en un solo sitio</p>
+      }
+      <span class="spacer"></span>
+      <button type="button" class="quick-add" (click)="abrirQuickAdd()">
+        <mat-icon>bolt</mat-icon>
+        <span>Añadir</span>
+      </button>
+    </header>
+
+    <main class="content">
+      <router-outlet />
+    </main>
+
+    @if (isHandset$ | async) {
+      <nav class="dock" aria-label="Navegación principal">
+        @for (item of navItems; track item.path) {
+          <a
+            class="dock-item"
+            [routerLink]="item.path"
+            routerLinkActive="active"
+          >
+            <mat-icon>{{ item.icon }}</mat-icon>
+            <span>{{ item.label }}</span>
+          </a>
+        }
+      </nav>
+    }
+  </div>
+</div>

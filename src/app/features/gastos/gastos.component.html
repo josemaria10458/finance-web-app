@@ -1,0 +1,116 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Gastos</h1>
+      <p class="subtitle">Resumen del mes por categoría e histórico detallado.</p>
+    </div>
+    <button class="btn-primary" type="button" (click)="abrirNuevo()">
+      <mat-icon>add</mat-icon>
+      Nuevo gasto
+    </button>
+  </header>
+
+  <div class="filters">
+    <label class="field">
+      <span>Mes</span>
+      <select
+        [ngModel]="mesFiltro() ?? ''"
+        (ngModelChange)="mesFiltro.set($event || null)"
+      >
+        <option value="">Todos</option>
+        @for (m of mesesDisponibles(); track m) {
+          <option [value]="m">{{ labelMes(m) }}</option>
+        }
+      </select>
+    </label>
+  </div>
+
+  <section class="month-hero" aria-label="Total del mes">
+    <span>{{ mesFiltro() ? 'Gastado en ' + labelMes(mesFiltro()!) : 'Total histórico' }}</span>
+    <strong>{{ totalMes() | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</strong>
+  </section>
+
+  <section class="cat-grid" aria-label="Gastos por categoría">
+    @for (c of cartasCategoria(); track c.categoria) {
+      <button
+        type="button"
+        class="cat-card"
+        [class.active]="categoriaFiltro() === c.categoria"
+        [class.empty]="c.total === 0"
+        [style.--tone]="c.tone"
+        (click)="seleccionarCategoria(c.categoria)"
+      >
+        <span class="cat-icon" aria-hidden="true">
+          <mat-icon>{{ c.icon }}</mat-icon>
+        </span>
+        <span class="cat-body">
+          <span class="cat-name">{{ c.categoria }}</span>
+          <strong>{{ c.total | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</strong>
+          <span class="cat-pct">{{ c.pct | number: '1.0-0' }} % del mes</span>
+        </span>
+      </button>
+    }
+  </section>
+
+  <div class="list-head">
+    <h2>
+      @if (categoriaFiltro() === 'todas') {
+        Movimientos
+      } @else {
+        {{ categoriaFiltro() }}
+      }
+    </h2>
+    <span>{{ totalFiltrado() | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</span>
+  </div>
+
+  @if (gastosFiltrados().length === 0) {
+    <div class="empty">
+      <p class="empty-title">Sin gastos en este filtro</p>
+      <p class="empty-copy">Importa el Excel o añade un gasto manualmente.</p>
+      <button class="btn-primary" type="button" (click)="abrirNuevo()">
+        Añadir gasto
+      </button>
+    </div>
+  } @else {
+    <ul class="list">
+      @for (g of gastosFiltrados(); track g.id; let i = $index) {
+        <li
+          class="row"
+          [style.--tone]="tone(g.categoria)"
+          [style.animation-delay]="i * 35 + 'ms'"
+        >
+          <button type="button" class="row-main" (click)="abrirEditar(g)">
+            <span class="row-icon" aria-hidden="true">
+              <mat-icon>{{ icon(g.categoria) }}</mat-icon>
+            </span>
+            <span class="row-body">
+              <span class="row-top">
+                <span class="desc">{{ g.descripcion }}</span>
+                <span class="amount"
+                  >{{ g.importe | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</span
+                >
+              </span>
+              <span class="row-meta">
+                <span>{{ g.fecha | date: 'dd/MM/yyyy' }}</span>
+                <span class="sep">·</span>
+                <span>{{ g.categoria }}</span>
+                @if (g.subcategoria) {
+                  <span class="sep">·</span>
+                  <span>{{ g.subcategoria }}</span>
+                }
+              </span>
+            </span>
+          </button>
+          <button
+            type="button"
+            class="row-delete"
+            matTooltip="Eliminar"
+            (click)="confirmarBorrar(g)"
+          >
+            <mat-icon>close</mat-icon>
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</div>
