@@ -1050,6 +1050,27 @@ export class ImportService {
         ])
       );
 
+      const resultadoNetoExcel = this.parseNumber(
+        this.pick(row, [
+          'resultado neto',
+          'resultado',
+          'ganancia',
+          'beneficio',
+          'pl',
+          'p l',
+        ])
+      );
+
+      const rentabilidadExcel = this.parsePercent(
+        this.pick(row, [
+          'rentabilidad',
+          'rentabilidad pct',
+          'rentabilidad %',
+          'rent',
+          'roi',
+        ])
+      );
+
       if (!empresa || !fecha || inversionRaw == null) {
         issues.push({
           sheet,
@@ -1084,14 +1105,15 @@ export class ImportService {
       }
 
       if (esVenta) {
-        const pCompra =
-          precioCompraAccion ??
-          (numeroAcciones > 0 ? importeAbs / numeroAcciones : null);
         const pVenta =
           precioVentaAccion ??
           (numeroAcciones > 0 ? importeAbs / numeroAcciones : null);
+        const pCompra = precioCompraAccion ?? null;
 
-        if (pCompra == null || pVenta == null) {
+        if (
+          (pCompra == null || pVenta == null) &&
+          resultadoNetoExcel == null
+        ) {
           issues.push({
             sheet,
             row: idx + 2,
@@ -1100,17 +1122,22 @@ export class ImportService {
           return;
         }
 
+        const pCompraFinal = pCompra ?? pVenta ?? 0;
+        const pVentaFinal = pVenta ?? pCompra ?? 0;
+
         out.push({
           empresa,
           fechaOperacion: fecha,
           fechaVenta: fecha,
-          inversion: pCompra * numeroAcciones,
-          precioCompraAccion: pCompra,
-          precioVentaAccion: pVenta,
+          inversion: pCompraFinal * numeroAcciones,
+          precioCompraAccion: pCompraFinal,
+          precioVentaAccion: pVentaFinal,
           comision: Math.abs(comision),
           numeroAcciones,
           provisionImpuestos: provisionImpuestos ?? undefined,
           esVenta: true,
+          resultadoNeto: resultadoNetoExcel ?? undefined,
+          rentabilidadPct: rentabilidadExcel ?? undefined,
         });
         return;
       }
@@ -1142,6 +1169,8 @@ export class ImportService {
         fechaVenta: cerradaPorPrecio ? fecha : undefined,
         provisionImpuestos: provisionImpuestos ?? undefined,
         esVenta: false,
+        resultadoNeto: resultadoNetoExcel ?? undefined,
+        rentabilidadPct: rentabilidadExcel ?? undefined,
       });
     });
 
@@ -1286,7 +1315,7 @@ export class ImportService {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
     let s = String(value).trim();
     if (!s) return null;
-    s = s.replace(/[€\s]/g, '');
+    s = s.replace(/[€\s%]/g, '');
     const neg = /^\(.*\)$/.test(s) || s.startsWith('-');
     s = s.replace(/^\(|\)$/g, '').replace(/^-/, '');
     if (/^\d{1,3}(\.\d{3})*(,\d+)?$/.test(s)) {
@@ -1297,6 +1326,16 @@ export class ImportService {
     const n = Number(s);
     if (!Number.isFinite(n)) return null;
     return neg ? -Math.abs(n) : n;
+  }
+
+  /** Rentabilidad % del Excel (0,195 → 19,5 puntos porcentuales). */
+  private parsePercent(value: unknown): number | null {
+    const n = this.parseNumber(value);
+    if (n == null) return null;
+    if (n !== 0 && Math.abs(n) <= 1) {
+      return n * 100;
+    }
+    return n;
   }
 
   private norm(s: string): string {

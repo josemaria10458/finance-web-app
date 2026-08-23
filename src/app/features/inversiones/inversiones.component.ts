@@ -1,15 +1,17 @@
 import { CurrencyPipe, DatePipe, DecimalPipe, PercentPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { OperacionBolsa, costeOperacion } from '../../core/models';
 import { InversionesService } from '../../core/services/inversiones.service';
+import { buildMonthOptions, formatMesLabel } from '../../core/utils/date.utils';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { CompraFormDialogComponent } from './compra-form-dialog.component';
 
-type Vista = 'historico' | 'ventas';
+type Vista = 'historico' | 'ventas' | 'meses';
 type OrdenCampo = 'fecha' | 'importe';
 type OrdenDir = 'asc' | 'desc';
 
@@ -21,6 +23,7 @@ type OrdenDir = 'asc' | 'desc';
     DatePipe,
     DecimalPipe,
     PercentPipe,
+    FormsModule,
     MatDialogModule,
     MatIconModule,
     MatSnackBarModule,
@@ -34,14 +37,34 @@ export class InversionesComponent {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
 
-  readonly vista = signal<Vista>('historico');
+  readonly vista = signal<Vista>('meses');
   readonly ordenCampo = signal<OrdenCampo>('fecha');
   readonly ordenDir = signal<OrdenDir>('desc');
+  readonly mesFiltro = signal<string>(
+    this.inversionesService.mesInicial()
+  );
 
   readonly capitalAbierto = this.inversionesService.capitalInvertidoAbierto;
   readonly resultadoVentas = this.inversionesService.resultadoNetoVentas;
-  readonly xirr = this.inversionesService.xirrCartera;
+  readonly rentabilidadAnual = this.inversionesService.rentabilidadAnual;
   readonly totalOps = computed(() => this.inversionesService.operaciones().length);
+
+  readonly resumenMensual = this.inversionesService.resumenMensual;
+
+  readonly mesesDisponibles = computed(() => {
+    this.inversionesService.operaciones();
+    return buildMonthOptions(this.inversionesService.mesesConDatos());
+  });
+
+  readonly resumenMesActual = computed(() => {
+    this.inversionesService.operaciones();
+    return this.inversionesService.resumenMes(this.mesFiltro());
+  });
+
+  readonly movimientosMes = computed(() => {
+    this.inversionesService.operaciones();
+    return this.inversionesService.movimientosMes(this.mesFiltro());
+  });
 
   readonly historico = computed(() =>
     this.sortOps([...this.inversionesService.operaciones()])
@@ -57,6 +80,15 @@ export class InversionesComponent {
 
   fechaRef(op: OperacionBolsa): string {
     return op.fechaVenta ?? op.fechaOperacion;
+  }
+
+  labelMes(ym: string): string {
+    return formatMesLabel(ym);
+  }
+
+  seleccionarMes(ym: string): void {
+    this.mesFiltro.set(ym);
+    this.vista.set('meses');
   }
 
   setVista(v: Vista): void {

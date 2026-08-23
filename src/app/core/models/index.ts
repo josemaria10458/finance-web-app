@@ -1,4 +1,5 @@
 export * from './gasto.model';
 export * from './ingreso.model';
+export * from './inversion-mensual.model';
 export * from './operacion-bolsa.model';
 export * from './resumen-mensual.model';
