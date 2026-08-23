@@ -1,10 +1,15 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { UserSessionService } from './core/services/user-session.service';
 
 @Component({
   selector: 'app-root',
+  standalone: true,
   imports: [RouterOutlet],
   template: `<router-outlet />`,
   styles: `:host { display: block; height: 100%; }`,
 })
-export class AppComponent {}
+export class AppComponent {
+  /** Inicializa el vínculo usuario ↔ datos en localStorage. */
+  private readonly _session = inject(UserSessionService);
+}

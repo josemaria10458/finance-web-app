@@ -58,6 +58,7 @@ export class GastosComponent {
 
   readonly mesFiltro = signal<string | null>(null);
   readonly categoriaFiltro = signal<CategoriaGasto | 'todas'>('todas');
+  readonly subcategoriaFiltro = signal<string | null>(null);
 
   readonly mesesDisponibles = computed(() =>
     buildMonthOptions(this.gastosService.availableYearMonths())
@@ -69,6 +70,14 @@ export class GastosComponent {
     const cat = this.categoriaFiltro();
     if (cat !== 'todas') {
       list = list.filter((g) => g.categoria === cat);
+    }
+    const sub = this.subcategoriaFiltro();
+    if (sub) {
+      list = list.filter((g) =>
+        sub === 'Sin subcategoría'
+          ? !g.subcategoria?.trim()
+          : g.subcategoria === sub
+      );
     }
     return [...list].sort((a, b) => b.fecha.localeCompare(a.fecha));
   });
@@ -92,12 +101,22 @@ export class GastosComponent {
     return CATEGORIAS_GASTO.map((categoria) => {
       const total = map[categoria] ?? 0;
       const meta = CATEGORY_META[categoria];
+      const subs = this.gastosService
+        .totalsBySubcategoria(this.mesFiltro(), categoria)
+        .map((s) => ({
+          nombre: s.subcategoria,
+          total: s.total,
+          pct: total > 0 ? (s.total / total) * 100 : 0,
+        }));
       return {
         categoria,
         total,
         pct: totalMes > 0 ? (total / totalMes) * 100 : 0,
         tone: meta.tone,
         icon: meta.icon,
+        subcategorias: subs,
+        tieneSubcategorias:
+          this.gastosService.categoriaTieneSubcategoriasDefinidas(categoria),
       };
     }).sort((a, b) => b.total - a.total);
   });
@@ -115,9 +134,24 @@ export class GastosComponent {
   }
 
   seleccionarCategoria(cat: CategoriaGasto): void {
-    this.categoriaFiltro.update((actual) =>
-      actual === cat ? 'todas' : cat
-    );
+    this.categoriaFiltro.update((actual) => {
+      if (actual === cat) {
+        this.subcategoriaFiltro.set(null);
+        return 'todas';
+      }
+      this.subcategoriaFiltro.set(null);
+      return cat;
+    });
+  }
+
+  seleccionarSubcategoria(cat: CategoriaGasto, sub: string, event: Event): void {
+    event.stopPropagation();
+    this.categoriaFiltro.set(cat);
+    this.subcategoriaFiltro.update((actual) => (actual === sub ? null : sub));
+  }
+
+  subcategoriaActiva(sub: string): boolean {
+    return this.subcategoriaFiltro() === sub;
   }
 
   abrirNuevo(): void {

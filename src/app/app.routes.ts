@@ -1,10 +1,18 @@
 import { Routes } from '@angular/router';
+import { authGuard, guestGuard } from './core/guards/auth.guard';
 import { ShellComponent } from './shared/components/shell/shell.component';
 
 export const routes: Routes = [
   {
+    path: 'login',
+    canActivate: [guestGuard],
+    loadComponent: () =>
+      import('./features/auth/login.component').then((m) => m.LoginComponent),
+  },
+  {
     path: '',
     component: ShellComponent,
+    canActivate: [authGuard],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'gastos' },
       {
@@ -26,6 +34,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/inversiones/inversiones.component').then(
             (m) => m.InversionesComponent
+          ),
+      },
+      {
+        path: 'fondos',
+        loadComponent: () =>
+          import('./features/fondos/fondos.component').then(
+            (m) => m.FondosComponent
           ),
       },
       {

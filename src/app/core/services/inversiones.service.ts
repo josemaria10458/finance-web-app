@@ -8,12 +8,13 @@ import { todayIso } from '../utils/date.utils';
 import { xirrFromIso } from '../utils/xirr.utils';
 import { StorageService } from './storage.service';
 
-const STORAGE_KEY = 'finanzas.operaciones-bolsa';
+const STORAGE_BASE = 'finanzas.operaciones-bolsa';
 
 @Injectable({ providedIn: 'root' })
 export class InversionesService {
   private readonly storage = inject(StorageService);
-  private readonly _operaciones = signal<OperacionBolsa[]>(this.load());
+  private uid: string | null = null;
+  private readonly _operaciones = signal<OperacionBolsa[]>([]);
 
   readonly operaciones = this._operaciones.asReadonly();
 
@@ -68,6 +69,20 @@ export class InversionesService {
 
   list(): OperacionBolsa[] {
     return this._operaciones();
+  }
+
+  bindUser(uid: string | null): void {
+    this.uid = uid;
+    if (!uid) {
+      this._operaciones.set([]);
+      return;
+    }
+    const userKey = this.storage.keyFor(STORAGE_BASE, uid);
+    const migrated = this.storage.migrateLegacy<OperacionBolsa[]>(
+      STORAGE_BASE,
+      userKey
+    );
+    this._operaciones.set(migrated ?? this.storage.read(userKey, []));
   }
 
   addCompra(
@@ -192,12 +207,13 @@ export class InversionesService {
     return nuevos.length;
   }
 
-  private load(): OperacionBolsa[] {
-    return this.storage.read<OperacionBolsa[]>(STORAGE_KEY, []);
-  }
-
   private persist(operaciones: OperacionBolsa[]): void {
     this._operaciones.set(operaciones);
-    this.storage.write(STORAGE_KEY, operaciones);
+    if (this.uid) {
+      this.storage.write(
+        this.storage.keyFor(STORAGE_BASE, this.uid),
+        operaciones
+      );
+    }
   }
 }
