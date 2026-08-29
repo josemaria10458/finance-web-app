@@ -1,20 +1,39 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Gasto, GastoInput } from '../models';
 import { yearMonthKey } from '../utils/date.utils';
-import { StorageService } from './storage.service';
+import { CategoriasConfigService } from './categorias-config.service';
+import { UserFirestoreService } from './user-firestore.service';
 
-const STORAGE_KEY = 'finanzas.gastos';
+export interface SubcategoriaTotal {
+  subcategoria: string;
+  total: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class GastosService {
-  private readonly storage = inject(StorageService);
-  private readonly _gastos = signal<Gasto[]>(this.load());
+  private readonly firestore = inject(UserFirestoreService);
+  private readonly categorias = inject(CategoriasConfigService);
+  private uid: string | null = null;
+  private readonly _gastos = signal<Gasto[]>([]);
 
   readonly gastos = this._gastos.asReadonly();
 
   readonly total = computed(() =>
     this._gastos().reduce((sum, g) => sum + g.importe, 0)
   );
+
+  setUid(uid: string | null): void {
+    this.uid = uid;
+  }
+
+  clearUser(): void {
+    this.uid = null;
+    this._gastos.set([]);
+  }
+
+  hydrate(gastos: Gasto[]): void {
+    this._gastos.set(gastos);
+  }
 
   list(): Gasto[] {
     return this._gastos();
@@ -68,17 +87,45 @@ export class GastosService {
     return map;
   }
 
+  totalsBySubcategoria(
+    yearMonth: string | null,
+    categoria: string
+  ): SubcategoriaTotal[] {
+    const canon = this.categorias.subcategoriasDe(categoria);
+    if (!canon.length) return [];
+
+    const map = new Map<string, number>();
+    for (const g of this.byYearMonth(yearMonth)) {
+      if (g.categoria !== categoria) continue;
+      const key = g.subcategoria?.trim() || 'Sin subcategoría';
+      map.set(key, (map.get(key) ?? 0) + g.importe);
+    }
+
+    const out: SubcategoriaTotal[] = [];
+    for (const sub of canon) {
+      const total = map.get(sub) ?? 0;
+      if (total > 0) out.push({ subcategoria: sub, total });
+      map.delete(sub);
+    }
+    for (const [subcategoria, total] of map.entries()) {
+      if (total > 0) out.push({ subcategoria, total });
+    }
+    return out.sort((a, b) => b.total - a.total);
+  }
+
+  categoriaTieneSubcategoriasDefinidas(categoria: string): boolean {
+    return this.categorias.categoriaTieneSubcategorias(categoria);
+  }
+
   availableYearMonths(): string[] {
     const keys = new Set(this._gastos().map((g) => yearMonthKey(g.fecha)));
     return [...keys].sort().reverse();
   }
 
-  private load(): Gasto[] {
-    return this.storage.read<Gasto[]>(STORAGE_KEY, []);
-  }
-
   private persist(gastos: Gasto[]): void {
     this._gastos.set(gastos);
-    this.storage.write(STORAGE_KEY, gastos);
+    if (this.uid) {
+      void this.firestore.patch(this.uid, { gastos });
+    }
   }
 }

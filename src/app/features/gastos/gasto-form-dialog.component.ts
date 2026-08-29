@@ -11,17 +11,19 @@ import {
   MatDialogRef,
 } from '@angular/material/dialog';
 import {
-  CATEGORIAS_GASTO,
   CategoriaGasto,
   Gasto,
-  categoriaTieneSubcategorias,
-  subcategoriasDe,
+  GastoInput,
 } from '../../core/models';
+import { CategoriasConfigService } from '../../core/services/categorias-config.service';
 import { GastosService } from '../../core/services/gastos.service';
 import { todayIso } from '../../core/utils/date.utils';
 
 export interface GastoFormDialogData {
   gasto?: Gasto;
+  /** Borrador de importación (sin id); no persiste al guardar. */
+  draft?: GastoInput;
+  previewMode?: boolean;
 }
 
 @Component({
@@ -29,7 +31,13 @@ export interface GastoFormDialogData {
   standalone: true,
   imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule],
   template: `
-    <h2 mat-dialog-title>{{ data.gasto ? 'Editar gasto' : 'Nuevo gasto' }}</h2>
+    <h2 mat-dialog-title>
+      {{
+        data.previewMode || data.gasto
+          ? 'Editar gasto'
+          : 'Nuevo gasto'
+      }}
+    </h2>
     <mat-dialog-content>
       <form [formGroup]="form" class="form" (ngSubmit)="guardar()">
         <label class="field">
@@ -57,7 +65,7 @@ export interface GastoFormDialogData {
         <label class="field">
           <span>Categoría</span>
           <select formControlName="categoria">
-            @for (c of categorias; track c) {
+            @for (c of categorias(); track c) {
               <option [value]="c">{{ c }}</option>
             }
           </select>
@@ -134,38 +142,38 @@ export class GastoFormDialogComponent {
   private readonly dialogRef = inject(MatDialogRef<GastoFormDialogComponent>);
   private readonly fb = inject(FormBuilder);
   private readonly gastosService = inject(GastosService);
+  private readonly categoriasConfig = inject(CategoriasConfigService);
 
-  readonly categorias = CATEGORIAS_GASTO;
+  readonly categorias = this.categoriasConfig.categoriasGasto;
+
+  private readonly initial = this.data.gasto ?? this.data.draft;
+  private readonly defaultCategoria =
+    this.initial?.categoria ?? this.categoriasConfig.categoriasGasto()[0] ?? '';
 
   readonly form = this.fb.nonNullable.group({
-    fecha: [this.data.gasto?.fecha ?? todayIso(), Validators.required],
+    fecha: [this.initial?.fecha ?? todayIso(), Validators.required],
     importe: [
-      this.data.gasto?.importe ?? (null as number | null),
+      this.initial?.importe ?? (null as number | null),
       [Validators.required, Validators.min(0.01)],
     ],
     descripcion: [
-      this.data.gasto?.descripcion ?? '',
+      this.initial?.descripcion ?? '',
       [Validators.required, Validators.maxLength(120)],
     ],
-    categoria: [
-      this.data.gasto?.categoria ?? ('Comida' as CategoriaGasto),
-      Validators.required,
-    ],
-    subcategoria: [this.data.gasto?.subcategoria ?? ''],
+    categoria: [this.defaultCategoria, Validators.required],
+    subcategoria: [this.initial?.subcategoria ?? ''],
   });
 
-  private readonly _categoria = signal(
-    this.data.gasto?.categoria ?? ('Comida' as CategoriaGasto)
-  );
+  private readonly _categoria = signal(this.defaultCategoria);
 
   readonly subcategoriasActuales = computed(() =>
-    subcategoriasDe(this._categoria())
+    this.categoriasConfig.subcategoriasDe(this._categoria())
   );
 
   constructor() {
     this.form.controls.categoria.valueChanges.subscribe((cat) => {
       this._categoria.set(cat);
-      const subs = subcategoriasDe(cat);
+      const subs = this.categoriasConfig.subcategoriasDe(cat);
       if (!subs.includes(this.form.controls.subcategoria.value)) {
         this.form.controls.subcategoria.setValue('');
       }
@@ -173,7 +181,7 @@ export class GastoFormDialogComponent {
   }
 
   tieneSubcategorias(): boolean {
-    return categoriaTieneSubcategorias(this._categoria());
+    return this.categoriasConfig.categoriaTieneSubcategorias(this._categoria());
   }
 
   guardar(): void {
@@ -182,7 +190,7 @@ export class GastoFormDialogComponent {
       return;
     }
     const raw = this.form.getRawValue();
-    const subs = subcategoriasDe(raw.categoria);
+    const subs = this.categoriasConfig.subcategoriasDe(raw.categoria);
     const input = {
       fecha: raw.fecha,
       importe: Number(raw.importe),
@@ -191,6 +199,11 @@ export class GastoFormDialogComponent {
       subcategoria:
         subs.length && raw.subcategoria ? raw.subcategoria : undefined,
     };
+
+    if (this.data.previewMode) {
+      this.dialogRef.close(input);
+      return;
+    }
 
     if (this.data.gasto) {
       this.gastosService.update(this.data.gasto.id, input);

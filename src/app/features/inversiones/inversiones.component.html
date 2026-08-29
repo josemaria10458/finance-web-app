@@ -2,7 +2,9 @@
   <header class="page-header">
     <div>
       <h1>Inversiones</h1>
-      <p class="subtitle">Histórico completo y ventas del Excel con rentabilidad.</p>
+      <p class="subtitle">
+        Rentabilidad anual de la cartera y desglose mensual de compras, ventas y resultados.
+      </p>
     </div>
     <div class="header-actions">
       <button
@@ -35,11 +37,16 @@
         {{ resultadoVentas() | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
       </strong>
     </div>
-    <div class="kpi">
-      <span>XIRR cartera</span>
+    <div class="kpi highlight-kpi">
+      <span
+        class="kpi-label"
+        title="TIR anualizada (XIRR): rentabilidad de toda la cartera según fechas de compra y venta"
+      >
+        Rentabilidad anual
+      </span>
       <strong>
-        @if (xirr() !== null) {
-          {{ xirr()! | percent: '1.1-2' : 'es' }}
+        @if (rentabilidadAnual() !== null) {
+          {{ rentabilidadAnual()! | percent: '1.2-2' : 'es' }}
         } @else {
           —
         }
@@ -49,6 +56,16 @@
 
   <div class="toolbar">
     <div class="tabs" role="tablist" aria-label="Vistas">
+      <button
+        type="button"
+        role="tab"
+        class="tab"
+        [class.active]="vista() === 'meses'"
+        [attr.aria-selected]="vista() === 'meses'"
+        (click)="setVista('meses')"
+      >
+        Por mes
+      </button>
       <button
         type="button"
         role="tab"
@@ -73,33 +90,196 @@
       </button>
     </div>
 
-    <div class="sort" role="group" aria-label="Ordenar">
-      <button
-        type="button"
-        class="sort-btn"
-        [class.active]="ordenCampo() === 'fecha'"
-        (click)="ordenarPor('fecha')"
-      >
-        Fecha
-        @if (ordenCampo() === 'fecha') {
-          <mat-icon>{{ ordenDir() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
-        }
-      </button>
-      <button
-        type="button"
-        class="sort-btn"
-        [class.active]="ordenCampo() === 'importe'"
-        (click)="ordenarPor('importe')"
-      >
-        Cantidad
-        @if (ordenCampo() === 'importe') {
-          <mat-icon>{{ ordenDir() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
-        }
-      </button>
-    </div>
+    @if (vista() !== 'meses') {
+      <div class="sort" role="group" aria-label="Ordenar">
+        <button
+          type="button"
+          class="sort-btn"
+          [class.active]="ordenCampo() === 'fecha'"
+          (click)="ordenarPor('fecha')"
+        >
+          Fecha
+          @if (ordenCampo() === 'fecha') {
+            <mat-icon>{{ ordenDir() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+          }
+        </button>
+        <button
+          type="button"
+          class="sort-btn"
+          [class.active]="ordenCampo() === 'importe'"
+          (click)="ordenarPor('importe')"
+        >
+          Cantidad
+          @if (ordenCampo() === 'importe') {
+            <mat-icon>{{ ordenDir() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+          }
+        </button>
+      </div>
+    }
   </div>
 
-  @if (vista() === 'historico') {
+  @if (vista() === 'meses') {
+    @if (totalOps() === 0) {
+      <div class="empty">
+        <p class="empty-title">Sin operaciones</p>
+        <p class="empty-copy">Importa el Excel o registra una compra.</p>
+        <button class="btn-primary" type="button" (click)="abrirCompra()">
+          Nueva compra
+        </button>
+      </div>
+    } @else {
+      <div class="month-toolbar">
+        <label class="field">
+          <span>Mes</span>
+          <select
+            [ngModel]="mesFiltro()"
+            (ngModelChange)="mesFiltro.set($event)"
+          >
+            @for (m of mesesDisponibles(); track m) {
+              <option [value]="m">{{ labelMes(m) }}</option>
+            }
+          </select>
+        </label>
+      </div>
+
+      <section class="month-kpis" aria-label="Resumen del mes">
+        <div class="month-kpi">
+          <span>Invertido</span>
+          <strong>{{
+            resumenMesActual().invertido | currency: 'EUR' : 'symbol' : '1.2-2' : 'es'
+          }}</strong>
+          <em>{{ resumenMesActual().numCompras }} compra(s)</em>
+        </div>
+        <div class="month-kpi">
+          <span>Resultado</span>
+          <strong
+            [class.gain]="resumenMesActual().resultado > 0"
+            [class.loss]="resumenMesActual().resultado < 0"
+          >
+            {{
+              resumenMesActual().resultado | currency: 'EUR' : 'symbol' : '1.2-2' : 'es'
+            }}
+          </strong>
+          <em>{{ resumenMesActual().numVentas }} venta(s)</em>
+        </div>
+        <div class="month-kpi">
+          <span>Rentabilidad del mes</span>
+          <strong
+            [class.gain]="(resumenMesActual().rentabilidadPct ?? 0) > 0"
+            [class.loss]="(resumenMesActual().rentabilidadPct ?? 0) < 0"
+          >
+            @if (resumenMesActual().rentabilidadPct != null) {
+              {{ resumenMesActual().rentabilidadPct | number: '1.2-2' : 'es' }} %
+            } @else {
+              —
+            }
+          </strong>
+        </div>
+      </section>
+
+      <section class="month-table-section" aria-label="Histórico mensual">
+        <h2>Todos los meses</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Mes</th>
+                <th>Invertido</th>
+                <th>Resultado</th>
+                <th>Rentab.</th>
+                <th>Movs.</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of resumenMensual(); track r.mesKey) {
+                <tr
+                  class="month-row"
+                  [class.active]="r.mesKey === mesFiltro()"
+                  (click)="seleccionarMes(r.mesKey)"
+                >
+                  <td>{{ r.mesLabel }}</td>
+                  <td>{{ r.invertido | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</td>
+                  <td
+                    [class.gain]="r.resultado > 0"
+                    [class.loss]="r.resultado < 0"
+                  >
+                    {{ r.resultado | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+                  </td>
+                  <td
+                    [class.gain]="(r.rentabilidadPct ?? 0) > 0"
+                    [class.loss]="(r.rentabilidadPct ?? 0) < 0"
+                  >
+                    @if (r.rentabilidadPct != null) {
+                      {{ r.rentabilidadPct | number: '1.2-2' : 'es' }} %
+                    } @else {
+                      —
+                    }
+                  </td>
+                  <td>{{ r.numCompras + r.numVentas }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <h2 class="list-title">Movimientos · {{ labelMes(mesFiltro()) }}</h2>
+
+      @if (movimientosMes().length === 0) {
+        <div class="empty empty-compact">
+          <p class="empty-copy">Sin movimientos en este mes.</p>
+        </div>
+      } @else {
+        <ul class="list">
+          @for (mov of movimientosMes(); track mov.operacion.id + mov.tipo; let i = $index) {
+            <li
+              class="row"
+              [class.mov-compra]="mov.tipo === 'compra'"
+              [class.mov-venta]="mov.tipo === 'venta'"
+              [style.animation-delay]="i * 35 + 'ms'"
+            >
+              <div class="row-body">
+                <div class="row-top">
+                  <span class="desc">
+                    {{ mov.operacion.empresa }}
+                    <em class="badge" [class.venta]="mov.tipo === 'venta'">
+                      {{ mov.tipo === 'compra' ? 'Compra' : 'Venta' }}
+                    </em>
+                  </span>
+                  <span
+                    class="amount"
+                    [class.gain]="mov.tipo === 'venta' && mov.importe >= 0"
+                    [class.loss]="mov.tipo === 'venta' && mov.importe < 0"
+                  >
+                    @if (mov.tipo === 'compra') {
+                      −{{ mov.importe | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+                    } @else {
+                      {{ mov.importe | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+                    }
+                  </span>
+                </div>
+                <div class="row-meta">
+                  <span>{{ mov.fecha | date: 'dd/MM/yyyy' }}</span>
+                  <span class="sep">·</span>
+                  <span>{{ mov.operacion.numeroAcciones | number: '1.0-4' }} acc.</span>
+                  @if (mov.tipo === 'venta') {
+                    <span class="sep">·</span>
+                    <span
+                      class="rent"
+                      [class.gain]="mov.operacion.rentabilidadPct >= 0"
+                      [class.loss]="mov.operacion.rentabilidadPct < 0"
+                    >
+                      {{ mov.operacion.rentabilidadPct | number: '1.2-2' }} %
+                    </span>
+                  }
+                </div>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    }
+  } @else if (vista() === 'historico') {
     @if (historico().length === 0) {
       <div class="empty">
         <p class="empty-title">Sin operaciones</p>

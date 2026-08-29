@@ -3,8 +3,8 @@
     <div>
       <h1>Importar</h1>
       <p class="subtitle">
-        Trae tu histórico desde Excel o CSV. Cada importación sobrescribe por
-        completo gastos, ingresos e inversiones en todas las pantallas.
+        Sube tu Excel, CSV o exportación de Trade Republic. Revisa, edita o
+        elimina cada transacción antes de guardarla.
       </p>
     </div>
   </header>
@@ -17,9 +17,9 @@
     (dragleave)="onDragLeave()"
     (drop)="onDrop($event)"
   >
-    <mat-icon>upload_file</mat-icon>
+    <mat-icon>document_scanner</mat-icon>
     <p class="dz-title">Arrastra aquí tu archivo</p>
-    <p class="dz-copy">.xlsx · .xls · .csv</p>
+    <p class="dz-copy">.xlsx · .xls · .csv · Trade Republic</p>
     <label class="btn-primary file-btn">
       Elegir archivo
       <input
@@ -32,20 +32,20 @@
   </div>
 
   <section class="hints">
-    <h2>Columnas reconocidas</h2>
+    <h2>Formatos reconocidos</h2>
     <ul>
       <li>
-        <strong>Gastos / Ingresos / Transacciones:</strong> fecha, importe,
-        descripción, categoría (se clasifican automáticamente)
+        <strong>Trade Republic (CSV):</strong> detecta tarjetas, transferencias,
+        compras/ventas de acciones y ETFs, e intereses
       </li>
       <li>
-        <strong>Bolsa:</strong> empresa, fecha, inversión (negativa = venta),
-        precio compra, precio venta, comisión, nº acciones
+        <strong>Excel propio:</strong> hojas Gastos, Ingresos, Transacciones o
+        Bolsa con las columnas habituales
       </li>
     </ul>
     <p>
-      Las hojas llamadas «Resumen» se ignoran. Las categorías deben coincidir con
-      las de la app (o aliases habituales).
+      Cada importación confirmada sobrescribe por completo gastos, ingresos e
+      inversiones en la app.
     </p>
   </section>
 
@@ -53,31 +53,183 @@
     <p class="error">{{ error() }}</p>
   }
 
+  @if (preview(); as p) {
+    <section class="preview">
+      <div class="preview-head">
+        <div>
+          <h2>Vista previa — {{ fileName() }}</h2>
+          <p class="preview-source">
+            @if (p.source === 'trade-republic') {
+              Exportación Trade Republic detectada
+            } @else {
+              Excel / CSV genérico
+            }
+            · {{ previewTotal() }} registros · edita o elimina antes de confirmar
+          </p>
+        </div>
+        <div class="preview-actions">
+          <button type="button" class="btn-ghost" (click)="cancelPreview()">
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn-primary"
+            [disabled]="busy() || previewTotal() === 0"
+            (click)="confirmImport()"
+          >
+            Confirmar importación
+          </button>
+        </div>
+      </div>
+
+      <div class="counts">
+        <div class="count-gastos">
+          <span>Gastos</span>
+          <strong>{{ p.gastos.length }}</strong>
+        </div>
+        <div class="count-ingresos">
+          <span>Ingresos</span>
+          <strong>{{ p.ingresos.length }}</strong>
+        </div>
+        <div class="count-inversiones">
+          <span>Inversiones</span>
+          <strong>{{ p.operaciones.length }}</strong>
+        </div>
+      </div>
+
+      @if (p.gastos.length) {
+        <details class="preview-block" open>
+          <summary>Gastos ({{ p.gastos.length }})</summary>
+          <ul class="preview-list">
+            @for (g of p.gastos; track $index) {
+              <li>
+                <span class="date">{{ g.fecha | date: 'dd/MM/yyyy' }}</span>
+                <span class="desc">{{ g.descripcion }}</span>
+                <span class="cat"
+                  >{{ g.categoria
+                  }}@if (g.subcategoria) {
+                    / {{ g.subcategoria }}
+                  }</span
+                >
+                <span class="amount negative">{{
+                  g.importe | currency: 'EUR'
+                }}</span>
+                <span class="row-actions">
+                  <button
+                    type="button"
+                    class="icon-action"
+                    matTooltip="Editar"
+                    (click)="editarGasto($index)"
+                  >
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-action danger"
+                    matTooltip="Eliminar"
+                    (click)="eliminarGasto($index)"
+                  >
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </span>
+              </li>
+            }
+          </ul>
+        </details>
+      }
+
+      @if (p.ingresos.length) {
+        <details class="preview-block" open>
+          <summary>Ingresos ({{ p.ingresos.length }})</summary>
+          <ul class="preview-list">
+            @for (i of p.ingresos; track $index) {
+              <li>
+                <span class="date">{{ i.fecha | date: 'dd/MM/yyyy' }}</span>
+                <span class="desc">{{ i.descripcion }}</span>
+                <span class="cat">{{ i.categoria }}</span>
+                <span class="amount positive">{{
+                  i.importe | currency: 'EUR'
+                }}</span>
+                <span class="row-actions">
+                  <button
+                    type="button"
+                    class="icon-action"
+                    matTooltip="Editar"
+                    (click)="editarIngreso($index)"
+                  >
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-action danger"
+                    matTooltip="Eliminar"
+                    (click)="eliminarIngreso($index)"
+                  >
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </span>
+              </li>
+            }
+          </ul>
+        </details>
+      }
+
+      @if (p.operaciones.length) {
+        <details class="preview-block" open>
+          <summary>Inversiones ({{ p.operaciones.length }})</summary>
+          <ul class="preview-list">
+            @for (o of p.operaciones; track $index) {
+              <li>
+                <span class="date">{{
+                  o.fechaOperacion | date: 'dd/MM/yyyy'
+                }}</span>
+                <span class="desc">{{ o.empresa }}</span>
+                <span class="cat">{{ o.esVenta ? 'Venta' : 'Compra' }}</span>
+                <span class="amount">{{
+                  o.inversion | currency: 'EUR'
+                }}</span>
+                <span class="row-actions">
+                  <button
+                    type="button"
+                    class="icon-action"
+                    matTooltip="Editar"
+                    (click)="editarOperacion($index)"
+                  >
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-action danger"
+                    matTooltip="Eliminar"
+                    (click)="eliminarOperacion($index)"
+                  >
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </span>
+              </li>
+            }
+          </ul>
+        </details>
+      }
+
+      @if (p.issues.length) {
+        <ul class="issues">
+          @for (issue of p.issues.slice(0, 10); track $index) {
+            <li>{{ issue.message }}</li>
+          }
+        </ul>
+      }
+    </section>
+  }
+
   @if (result(); as r) {
     <section class="result">
-      <h2>Resultado{{ fileName() ? ' — ' + fileName() : '' }}</h2>
+      <h2>Importación completada</h2>
       <div class="counts">
         <div><span>Gastos</span><strong>{{ r.gastos }}</strong></div>
         <div><span>Ingresos</span><strong>{{ r.ingresos }}</strong></div>
         <div><span>Operaciones</span><strong>{{ r.operaciones }}</strong></div>
-        <div><span>Avisos</span><strong>{{ r.issues.length }}</strong></div>
       </div>
-      @if (r.issues.length) {
-        <ul class="issues">
-          @for (issue of r.issues.slice(0, 40); track $index) {
-            <li>
-              <strong>{{ issue.sheet }}</strong>
-              @if (issue.row) {
-                · fila {{ issue.row }}
-              }
-              — {{ issue.message }}
-            </li>
-          }
-          @if (r.issues.length > 40) {
-            <li>… y {{ r.issues.length - 40 }} más</li>
-          }
-        </ul>
-      }
     </section>
   }
 </div>

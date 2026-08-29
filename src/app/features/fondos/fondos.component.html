@@ -1,0 +1,220 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Fondos &amp; ETFs</h1>
+      <p class="subtitle">
+        Lista curada de ETFs baratos y diversificados, con métricas en vivo de
+        <a href="https://securitiesdb.com" target="_blank" rel="noopener">SecuritiesDB</a>
+        (gratis, sin API key).
+      </p>
+    </div>
+    <button
+      class="btn-primary"
+      type="button"
+      [disabled]="loading()"
+      (click)="cargar()"
+    >
+      <mat-icon>{{ loading() ? 'hourglass_top' : 'refresh' }}</mat-icon>
+      {{ loading() ? 'Cargando…' : 'Actualizar' }}
+    </button>
+  </header>
+
+  <div class="presets" aria-label="Filtrar por categoría">
+    @for (f of categoryFilters; track f.value) {
+      <button
+        type="button"
+        class="preset-chip"
+        [class.active]="category() === f.value"
+        [disabled]="loading()"
+        (click)="setCategory(f.value)"
+      >
+        {{ f.label }}
+      </button>
+    }
+  </div>
+
+  <p class="disclaimer">
+    Datos de ETFs US (SEC). Si inviertes desde Europa, usa el tip UCITS de cada tarjeta.
+    No es consejo de inversión.
+  </p>
+
+  @if (loading()) {
+    <div class="loading" role="status">
+      <mat-icon class="spin">sync</mat-icon>
+      <p>Consultando SecuritiesDB…</p>
+    </div>
+  }
+
+  @if (error() && !loading()) {
+    <div class="alert alert-error">
+      <mat-icon>error_outline</mat-icon>
+      <p>{{ error() }}</p>
+    </div>
+  }
+
+  @if (loaded() && !loading()) {
+    <section class="top-section" aria-label="Mejores opciones">
+      <h2>Top por score (TER + Sharpe + diversificación)</h2>
+      <div class="top-grid">
+        @for (etf of topProfiles(); track etf.ticker; let i = $index) {
+          <article class="top-card" [style.animation-delay]="i * 40 + 'ms'">
+            <span class="rank">#{{ i + 1 }}</span>
+            <div class="ticker-row">
+              <strong class="ticker">{{ etf.ticker }}</strong>
+              <span class="cat-badge">{{ categoryLabels[etf.category] }}</span>
+            </div>
+            <h3>{{ etf.name }}</h3>
+            <p class="why">{{ etf.why }}</p>
+            @if (etf.europeHint) {
+              <p class="europe">Europa ≈ {{ etf.europeHint }}</p>
+            }
+            @if (etf.metrics; as m) {
+              <dl class="metrics">
+                <div>
+                  <dt>TER</dt>
+                  <dd>{{ formatTer(m.expenseRatio) }}</dd>
+                </div>
+                <div>
+                  <dt>Sharpe 3a</dt>
+                  <dd>{{ formatNum(m.sharpe3y) }}</dd>
+                </div>
+                <div>
+                  <dt>Drawdown 3a</dt>
+                  <dd>{{ formatPct(m.maxDrawdown3y) }}</dd>
+                </div>
+                <div>
+                  <dt>Holdings</dt>
+                  <dd>{{ m.numHoldings ?? '—' }}</dd>
+                </div>
+                <div>
+                  <dt>AUM</dt>
+                  <dd>{{ formatAum(m.aum) }}</dd>
+                </div>
+                <div>
+                  <dt>Score</dt>
+                  <dd class="score-val">{{ etf.score | number: '1.0-1' : 'es' }}</dd>
+                </div>
+              </dl>
+              @if (m.diversification) {
+                <span class="div-tag">{{ m.diversification }}</span>
+              }
+            } @else {
+              <p class="no-data">{{ etf.error ?? 'Sin métricas' }}</p>
+            }
+          </article>
+        }
+      </div>
+    </section>
+
+    <section class="table-section" aria-label="Listado completo">
+      <h2>Todos ({{ profiles().length }})</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>ETF</th>
+              <th>Categoría</th>
+              <th>TER</th>
+              <th>Sharpe 3a</th>
+              <th>Volatilidad</th>
+              <th>Top 10</th>
+              <th>AUM</th>
+              <th>Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (etf of profiles(); track etf.ticker; let i = $index) {
+              <tr>
+                <td>{{ i + 1 }}</td>
+                <td class="name-cell">
+                  <strong>{{ etf.ticker }}</strong>
+                  <span class="cat">{{ etf.name }}</span>
+                  @if (etf.europeHint) {
+                    <span class="cat">EU ≈ {{ etf.europeHint }}</span>
+                  }
+                </td>
+                <td>{{ categoryLabels[etf.category] }}</td>
+                <td>{{ formatTer(etf.metrics?.expenseRatio ?? null) }}</td>
+                <td>{{ formatNum(etf.metrics?.sharpe3y ?? null) }}</td>
+                <td>{{ formatPct(etf.metrics?.volatility ?? null) }}</td>
+                <td>
+                  @if (etf.metrics?.top10Concentration != null) {
+                    {{ etf.metrics!.top10Concentration | number: '1.0-1' : 'es' }} %
+                  } @else {
+                    —
+                  }
+                </td>
+                <td>{{ formatAum(etf.metrics?.aum ?? null) }}</td>
+                <td class="score">{{ etf.score | number: '1.0-1' : 'es' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="overlap-section" aria-label="Solapamiento entre ETFs">
+      <h2>¿Se solapan demasiado?</h2>
+      <p class="subtitle-inline">
+        Compara dos ETFs para ver qué % de cartera comparten.
+      </p>
+      <div class="overlap-row">
+        <label class="field">
+          <span>ETF A</span>
+          <select [ngModel]="overlapA()" (ngModelChange)="overlapA.set($event)">
+            @for (t of tickers(); track t) {
+              <option [value]="t">{{ t }}</option>
+            }
+          </select>
+        </label>
+        <label class="field">
+          <span>ETF B</span>
+          <select [ngModel]="overlapB()" (ngModelChange)="overlapB.set($event)">
+            @for (t of tickers(); track t) {
+              <option [value]="t">{{ t }}</option>
+            }
+          </select>
+        </label>
+        <button
+          class="btn-primary"
+          type="button"
+          [disabled]="overlapLoading()"
+          (click)="comparar()"
+        >
+          {{ overlapLoading() ? 'Comparando…' : 'Comparar' }}
+        </button>
+      </div>
+
+      @if (overlapError()) {
+        <div class="alert alert-error">
+          <mat-icon>error_outline</mat-icon>
+          <p>{{ overlapError() }}</p>
+        </div>
+      }
+
+      @if (overlap(); as o) {
+        <div class="overlap-result">
+          <strong>{{ o.etf1 }} ↔ {{ o.etf2 }}</strong>
+          <p>
+            Solapamiento:
+            @if (o.overlapPct != null) {
+              <span class="score-val">{{ o.overlapPct | number: '1.0-1' : 'es' }} %</span>
+            } @else {
+              —
+            }
+          </p>
+          @if (o.verdict) {
+            <p class="verdict">{{ o.verdict }}</p>
+          }
+        </div>
+      }
+    </section>
+
+    <p class="attribution">
+      Datos vía
+      <a href="https://securitiesdb.com" target="_blank" rel="noopener">securitiesdb.com</a>
+      · fuentes SEC / EDGAR.
+    </p>
+  }
+</div>

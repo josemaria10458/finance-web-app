@@ -1,15 +1,16 @@
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import {
-  CATEGORIAS_GASTO,
   CategoriaGasto,
   Gasto,
 } from '../../core/models';
+import { CategoriasConfigService } from '../../core/services/categorias-config.service';
+import { FiltroAnioService } from '../../core/services/filtro-anio.service';
 import { GastosService } from '../../core/services/gastos.service';
 import {
   formatMesLabel,
@@ -21,10 +22,7 @@ import {
   GastoFormDialogData,
 } from './gasto-form-dialog.component';
 
-const CATEGORY_META: Record<
-  CategoriaGasto,
-  { tone: string; icon: string }
-> = {
+const CATEGORY_META: Record<string, { tone: string; icon: string }> = {
   Ocio: { tone: '#2f9b8f', icon: 'sports_tennis' },
   Viajes: { tone: '#3b6ea5', icon: 'flight' },
   Comida: { tone: '#c47a3a', icon: 'restaurant' },
@@ -32,6 +30,17 @@ const CATEGORY_META: Record<
   Transporte: { tone: '#4d6b57', icon: 'directions_car' },
   'Gastos propios': { tone: '#b54a3a', icon: 'person' },
 };
+
+const CATEGORY_PALETTE = [
+  '#2f9b8f',
+  '#3b6ea5',
+  '#c47a3a',
+  '#9a6b4f',
+  '#4d6b57',
+  '#b54a3a',
+  '#1f6f66',
+  '#2563eb',
+];
 
 @Component({
   selector: 'app-gastos',
@@ -51,32 +60,50 @@ const CATEGORY_META: Record<
 })
 export class GastosComponent {
   private readonly gastosService = inject(GastosService);
+  private readonly categoriasConfig = inject(CategoriasConfigService);
+  private readonly filtroAnio = inject(FiltroAnioService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
 
-  readonly categorias = CATEGORIAS_GASTO;
+  readonly categorias = this.categoriasConfig.categoriasGasto;
 
   readonly mesFiltro = signal<string | null>(null);
   readonly categoriaFiltro = signal<CategoriaGasto | 'todas'>('todas');
+  readonly subcategoriaFiltro = signal<string | null>(null);
 
-  readonly mesesDisponibles = computed(() =>
-    buildMonthOptions(this.gastosService.availableYearMonths())
-  );
+  readonly mesesDisponibles = computed(() => {
+    const months = buildMonthOptions(this.gastosService.availableYearMonths());
+    const year = this.filtroAnio.year();
+    if (year == null) return months;
+    return months.filter((m) => m.startsWith(`${year}-`));
+  });
 
   readonly gastosFiltrados = computed(() => {
     this.gastosService.gastos();
+    this.filtroAnio.year();
     let list = this.gastosService.byYearMonth(this.mesFiltro());
+    list = list.filter((g) => this.filtroAnio.matchesDate(g.fecha));
     const cat = this.categoriaFiltro();
     if (cat !== 'todas') {
       list = list.filter((g) => g.categoria === cat);
+    }
+    const sub = this.subcategoriaFiltro();
+    if (sub) {
+      list = list.filter((g) =>
+        sub === 'Sin subcategoría'
+          ? !g.subcategoria?.trim()
+          : g.subcategoria === sub
+      );
     }
     return [...list].sort((a, b) => b.fecha.localeCompare(a.fecha));
   });
 
   readonly totalMes = computed(() => {
     this.gastosService.gastos();
+    this.filtroAnio.year();
     return this.gastosService
       .byYearMonth(this.mesFiltro())
+      .filter((g) => this.filtroAnio.matchesDate(g.fecha))
       .reduce((s, g) => s + g.importe, 0);
   });
 
@@ -84,30 +111,69 @@ export class GastosComponent {
     this.gastosFiltrados().reduce((s, g) => s + g.importe, 0)
   );
 
-  /** Cartas de gasto del mes por categoría (todas las categorías). */
   readonly cartasCategoria = computed(() => {
     this.gastosService.gastos();
-    const map = this.gastosService.totalsByCategoria(this.mesFiltro());
+    this.filtroAnio.year();
+    this.categoriasConfig.config();
+    const gastosMes = this.gastosService
+      .byYearMonth(this.mesFiltro())
+      .filter((g) => this.filtroAnio.matchesDate(g.fecha));
+    const map: Record<string, number> = {};
+    for (const g of gastosMes) {
+      map[g.categoria] = (map[g.categoria] ?? 0) + g.importe;
+    }
     const totalMes = this.totalMes();
-    return CATEGORIAS_GASTO.map((categoria) => {
+    return this.categoriasConfig.categoriasGasto().map((categoria, index) => {
       const total = map[categoria] ?? 0;
-      const meta = CATEGORY_META[categoria];
+      const meta = CATEGORY_META[categoria] ?? {
+        tone: CATEGORY_PALETTE[index % CATEGORY_PALETTE.length],
+        icon: 'payments',
+      };
+      const subMap = new Map<string, number>();
+      for (const g of gastosMes) {
+        if (g.categoria !== categoria) continue;
+        const key = g.subcategoria?.trim() || 'Sin subcategoría';
+        subMap.set(key, (subMap.get(key) ?? 0) + g.importe);
+      }
+      const subs = [...subMap.entries()]
+        .map(([nombre, t]) => ({
+          nombre,
+          total: t,
+          pct: total > 0 ? (t / total) * 100 : 0,
+        }))
+        .sort((a, b) => b.total - a.total);
       return {
         categoria,
         total,
         pct: totalMes > 0 ? (total / totalMes) * 100 : 0,
         tone: meta.tone,
         icon: meta.icon,
+        subcategorias: subs,
+        tieneSubcategorias:
+          this.gastosService.categoriaTieneSubcategoriasDefinidas(categoria),
       };
     }).sort((a, b) => b.total - a.total);
   });
 
-  tone(categoria: string): string {
-    return CATEGORY_META[categoria as CategoriaGasto]?.tone ?? '#1f6f66';
+  constructor() {
+    effect(() => {
+      const year = this.filtroAnio.year();
+      const mes = this.mesFiltro();
+      if (year != null && mes && !mes.startsWith(`${year}-`)) {
+        this.mesFiltro.set(null);
+      }
+    });
+  }
+
+  tone(categoria: string, index = 0): string {
+    return (
+      CATEGORY_META[categoria]?.tone ??
+      CATEGORY_PALETTE[index % CATEGORY_PALETTE.length]
+    );
   }
 
   icon(categoria: string): string {
-    return CATEGORY_META[categoria as CategoriaGasto]?.icon ?? 'payments';
+    return CATEGORY_META[categoria]?.icon ?? 'payments';
   }
 
   labelMes(ym: string): string {
@@ -115,9 +181,28 @@ export class GastosComponent {
   }
 
   seleccionarCategoria(cat: CategoriaGasto): void {
-    this.categoriaFiltro.update((actual) =>
-      actual === cat ? 'todas' : cat
-    );
+    this.categoriaFiltro.update((actual) => {
+      if (actual === cat) {
+        this.subcategoriaFiltro.set(null);
+        return 'todas';
+      }
+      this.subcategoriaFiltro.set(null);
+      return cat;
+    });
+  }
+
+  seleccionarSubcategoria(
+    cat: CategoriaGasto,
+    sub: string,
+    event: Event
+  ): void {
+    event.stopPropagation();
+    this.categoriaFiltro.set(cat);
+    this.subcategoriaFiltro.update((actual) => (actual === sub ? null : sub));
+  }
+
+  subcategoriaActiva(sub: string): boolean {
+    return this.subcategoriaFiltro() === sub;
   }
 
   abrirNuevo(): void {

@@ -1,15 +1,18 @@
 import { CurrencyPipe, DatePipe, DecimalPipe, PercentPipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { OperacionBolsa, costeOperacion } from '../../core/models';
+import { FiltroAnioService } from '../../core/services/filtro-anio.service';
 import { InversionesService } from '../../core/services/inversiones.service';
+import { buildMonthOptions, formatMesLabel } from '../../core/utils/date.utils';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { CompraFormDialogComponent } from './compra-form-dialog.component';
 
-type Vista = 'historico' | 'ventas';
+type Vista = 'historico' | 'ventas' | 'meses';
 type OrdenCampo = 'fecha' | 'importe';
 type OrdenDir = 'asc' | 'desc';
 
@@ -21,6 +24,7 @@ type OrdenDir = 'asc' | 'desc';
     DatePipe,
     DecimalPipe,
     PercentPipe,
+    FormsModule,
     MatDialogModule,
     MatIconModule,
     MatSnackBarModule,
@@ -31,25 +35,77 @@ type OrdenDir = 'asc' | 'desc';
 })
 export class InversionesComponent {
   private readonly inversionesService = inject(InversionesService);
+  private readonly filtroAnio = inject(FiltroAnioService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
 
-  readonly vista = signal<Vista>('historico');
+  readonly vista = signal<Vista>('meses');
   readonly ordenCampo = signal<OrdenCampo>('fecha');
   readonly ordenDir = signal<OrdenDir>('desc');
+  readonly mesFiltro = signal<string>(this.inversionesService.mesInicial());
 
   readonly capitalAbierto = this.inversionesService.capitalInvertidoAbierto;
   readonly resultadoVentas = this.inversionesService.resultadoNetoVentas;
-  readonly xirr = this.inversionesService.xirrCartera;
-  readonly totalOps = computed(() => this.inversionesService.operaciones().length);
+  readonly rentabilidadAnual = this.inversionesService.rentabilidadAnual;
 
-  readonly historico = computed(() =>
-    this.sortOps([...this.inversionesService.operaciones()])
-  );
+  readonly totalOps = computed(() => {
+    this.filtroAnio.year();
+    return this.opsDelAnio().length;
+  });
+
+  readonly resumenMensual = computed(() => {
+    this.filtroAnio.year();
+    return this.inversionesService
+      .resumenMensual()
+      .filter((r) => this.filtroAnio.matchesYearMonth(r.mesKey));
+  });
+
+  readonly mesesDisponibles = computed(() => {
+    this.inversionesService.operaciones();
+    const months = buildMonthOptions(this.inversionesService.mesesConDatos());
+    const year = this.filtroAnio.year();
+    if (year == null) return months;
+    return months.filter((m) => m.startsWith(`${year}-`));
+  });
+
+  readonly resumenMesActual = computed(() => {
+    this.inversionesService.operaciones();
+    return this.inversionesService.resumenMes(this.mesFiltro());
+  });
+
+  readonly movimientosMes = computed(() => {
+    this.inversionesService.operaciones();
+    return this.inversionesService.movimientosMes(this.mesFiltro());
+  });
+
+  readonly historico = computed(() => this.sortOps([...this.opsDelAnio()]));
 
   readonly ventas = computed(() =>
-    this.sortOps([...this.inversionesService.ventas()])
+    this.sortOps(
+      this.opsDelAnio().filter(
+        (o) => o.esVenta === true || o.precioVentaAccion != null
+      )
+    )
   );
+
+  constructor() {
+    effect(() => {
+      const year = this.filtroAnio.year();
+      const mes = this.mesFiltro();
+      const disponibles = this.mesesDisponibles();
+      if (year != null && mes && !mes.startsWith(`${year}-`)) {
+        this.mesFiltro.set(disponibles[0] ?? `${year}-01`);
+      }
+    });
+  }
+
+  private opsDelAnio(): OperacionBolsa[] {
+    return this.inversionesService
+      .operaciones()
+      .filter((o) =>
+        this.filtroAnio.matchesDate(o.fechaVenta ?? o.fechaOperacion)
+      );
+  }
 
   coste(op: OperacionBolsa): number {
     return costeOperacion(op);
@@ -57,6 +113,15 @@ export class InversionesComponent {
 
   fechaRef(op: OperacionBolsa): string {
     return op.fechaVenta ?? op.fechaOperacion;
+  }
+
+  labelMes(ym: string): string {
+    return formatMesLabel(ym);
+  }
+
+  seleccionarMes(ym: string): void {
+    this.mesFiltro.set(ym);
+    this.vista.set('meses');
   }
 
   setVista(v: Vista): void {

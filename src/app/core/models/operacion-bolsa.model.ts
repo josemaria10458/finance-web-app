@@ -28,3 +28,11 @@ export function costeOperacion(
 ): number {
   return op.inversion + op.comision;
 }
+
+/** Excel suele guardar 19,5 % como 0,195; la UI muestra puntos porcentuales (19,5). */
+export function normalizeRentabilidadPct(value: number): number {
+  if (value !== 0 && Math.abs(value) <= 1) {
+    return value * 100;
+  }
+  return value;
+}
