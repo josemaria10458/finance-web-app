@@ -2,6 +2,7 @@ import { CurrencyPipe, PercentPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { Chart, ChartConfiguration, Plugin } from 'chart.js';
 import { RangoResumen } from '../../core/models';
+import { FiltroAnioService } from '../../core/services/filtro-anio.service';
 import { ResumenService } from '../../core/services/resumen.service';
 import { ChartPanelComponent } from '../../shared/charts/chart-panel.component';
 
@@ -66,6 +67,7 @@ Chart.register(doughnutPercentPlugin);
 })
 export class ResumenComponent {
   private readonly resumenService = inject(ResumenService);
+  private readonly filtroAnio = inject(FiltroAnioService);
 
   readonly rango = signal<RangoResumen>('anio');
   readonly rangos: { id: RangoResumen; label: string }[] = [
@@ -75,13 +77,20 @@ export class ResumenComponent {
     { id: 'todo', label: 'Todo' },
   ];
 
-  readonly series = computed(() =>
-    this.resumenService.filtrarPorRango(this.rango())
-  );
+  readonly series = computed(() => {
+    this.filtroAnio.year();
+    return this.resumenService.filtrarPorRango(this.rango());
+  });
 
-  readonly kpis = computed(() => this.resumenService.kpis(this.rango()));
+  readonly kpis = computed(() => {
+    this.filtroAnio.year();
+    return this.resumenService.kpis(this.rango());
+  });
 
-  readonly hasData = computed(() => this.resumenService.mensuales().length > 0);
+  readonly hasData = computed(() => {
+    this.filtroAnio.year();
+    return this.series().length > 0;
+  });
 
   readonly ingresosGastosData = computed<ChartConfiguration['data']>(() => {
     const rows = this.series();
@@ -161,6 +170,7 @@ export class ResumenComponent {
   };
 
   readonly donutData = computed<ChartConfiguration['data']>(() => {
+    this.filtroAnio.year();
     const cats = this.resumenService.gastosPorCategoria(this.rango());
     return {
       labels: cats.map((c) => c.label),

@@ -1,13 +1,11 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Ingreso, IngresoInput } from '../models';
 import { yearMonthKey } from '../utils/date.utils';
-import { StorageService } from './storage.service';
-
-const STORAGE_BASE = 'finanzas.ingresos';
+import { UserFirestoreService } from './user-firestore.service';
 
 @Injectable({ providedIn: 'root' })
 export class IngresosService {
-  private readonly storage = inject(StorageService);
+  private readonly firestore = inject(UserFirestoreService);
   private uid: string | null = null;
   private readonly _ingresos = signal<Ingreso[]>([]);
 
@@ -17,18 +15,17 @@ export class IngresosService {
     this._ingresos().reduce((sum, i) => sum + i.importe, 0)
   );
 
-  bindUser(uid: string | null): void {
+  setUid(uid: string | null): void {
     this.uid = uid;
-    if (!uid) {
-      this._ingresos.set([]);
-      return;
-    }
-    const userKey = this.storage.keyFor(STORAGE_BASE, uid);
-    const migrated = this.storage.migrateLegacy<Ingreso[]>(
-      STORAGE_BASE,
-      userKey
-    );
-    this._ingresos.set(migrated ?? this.storage.read(userKey, []));
+  }
+
+  clearUser(): void {
+    this.uid = null;
+    this._ingresos.set([]);
+  }
+
+  hydrate(ingresos: Ingreso[]): void {
+    this._ingresos.set(ingresos);
   }
 
   list(): Ingreso[] {
@@ -91,7 +88,7 @@ export class IngresosService {
   private persist(ingresos: Ingreso[]): void {
     this._ingresos.set(ingresos);
     if (this.uid) {
-      this.storage.write(this.storage.keyFor(STORAGE_BASE, this.uid), ingresos);
+      void this.firestore.patch(this.uid, { ingresos });
     }
   }
 }

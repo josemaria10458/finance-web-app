@@ -16,9 +16,7 @@ import {
   resumenDeMes,
 } from '../utils/inversion-mensual.utils';
 import { xirrFromIso } from '../utils/xirr.utils';
-import { StorageService } from './storage.service';
-
-const STORAGE_BASE = 'finanzas.operaciones-bolsa';
+import { UserFirestoreService } from './user-firestore.service';
 
 /**
  * Flujos de caja para XIRR según el libro del Excel:
@@ -91,7 +89,7 @@ function ingresoVenta(o: OperacionBolsa): number {
 
 @Injectable({ providedIn: 'root' })
 export class InversionesService {
-  private readonly storage = inject(StorageService);
+  private readonly firestore = inject(UserFirestoreService);
   private uid: string | null = null;
   private readonly _operaciones = signal<OperacionBolsa[]>([]);
 
@@ -164,18 +162,17 @@ export class InversionesService {
     return this._operaciones();
   }
 
-  bindUser(uid: string | null): void {
+  setUid(uid: string | null): void {
     this.uid = uid;
-    if (!uid) {
-      this._operaciones.set([]);
-      return;
-    }
-    const userKey = this.storage.keyFor(STORAGE_BASE, uid);
-    const migrated = this.storage.migrateLegacy<OperacionBolsa[]>(
-      STORAGE_BASE,
-      userKey
-    );
-    this._operaciones.set(migrated ?? this.storage.read(userKey, []));
+  }
+
+  clearUser(): void {
+    this.uid = null;
+    this._operaciones.set([]);
+  }
+
+  hydrate(operaciones: OperacionBolsa[]): void {
+    this._operaciones.set(operaciones);
   }
 
   addCompra(
@@ -317,10 +314,7 @@ export class InversionesService {
   private persist(operaciones: OperacionBolsa[]): void {
     this._operaciones.set(operaciones);
     if (this.uid) {
-      this.storage.write(
-        this.storage.keyFor(STORAGE_BASE, this.uid),
-        operaciones
-      );
+      void this.firestore.patch(this.uid, { operaciones });
     }
   }
 }

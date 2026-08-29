@@ -3,33 +3,40 @@ import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { UserSessionService } from '../services/user-session.service';
 
-export const authGuard: CanActivateFn = async () => {
+/** Redirige a configuración inicial si el usuario no tiene datos guardados. */
+export const onboardingGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);
   const session = inject(UserSessionService);
   const router = inject(Router);
 
   await auth.waitUntilReady();
-
   if (!auth.isAuthenticated()) {
     return router.createUrlTree(['/login']);
   }
 
   await session.waitUntilDataReady();
+
+  if (session.needsInitialSetup()) {
+    return router.createUrlTree(['/configuracion-inicial']);
+  }
+
   return true;
 };
 
-export const guestGuard: CanActivateFn = async () => {
+/** Solo accesible mientras falta completar el onboarding. */
+export const setupOnlyGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);
   const session = inject(UserSessionService);
   const router = inject(Router);
 
   await auth.waitUntilReady();
+  if (!auth.isAuthenticated()) {
+    return router.createUrlTree(['/login']);
+  }
 
-  if (auth.isAuthenticated()) {
-    await session.waitUntilDataReady();
-    if (session.needsInitialSetup()) {
-      return router.createUrlTree(['/configuracion-inicial']);
-    }
+  await session.waitUntilDataReady();
+
+  if (!session.needsInitialSetup()) {
     return router.createUrlTree(['/gastos']);
   }
 

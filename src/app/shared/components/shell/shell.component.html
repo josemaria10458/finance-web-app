@@ -24,6 +24,16 @@
 
     <a
       class="rail-link secondary"
+      routerLink="/configuracion"
+      routerLinkActive="active"
+      (click)="closeRailOnMobile()"
+    >
+      <mat-icon>tune</mat-icon>
+      <span>Categorías</span>
+    </a>
+
+    <a
+      class="rail-link secondary"
       routerLink="/importar"
       routerLinkActive="active"
       (click)="closeRailOnMobile()"
@@ -63,6 +73,20 @@
         <p class="topbar-note">Tu dinero, en un solo sitio</p>
       }
       <span class="spacer"></span>
+      <label class="year-filter" title="Filtrar por año">
+        <mat-icon class="year-icon" aria-hidden="true">calendar_today</mat-icon>
+        <span class="year-label">Año</span>
+        <select
+          [ngModel]="filtroAnio.year() ?? ''"
+          (ngModelChange)="onYearChange($event)"
+          aria-label="Filtrar por año"
+        >
+          <option value="">Todos</option>
+          @for (y of filtroAnio.availableYears(); track y) {
+            <option [value]="y">{{ y }}</option>
+          }
+        </select>
+      </label>
       @if (auth.user(); as user) {
         <div class="user-chip">
           @if (user.photoURL) {

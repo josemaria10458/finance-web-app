@@ -6,6 +6,7 @@ import {
   formatMesLabel,
   yearMonthKey,
 } from '../utils/date.utils';
+import { FiltroAnioService } from './filtro-anio.service';
 import { GastosService } from './gastos.service';
 import { IngresosService } from './ingresos.service';
 import { InversionesService } from './inversiones.service';
@@ -17,6 +18,7 @@ export class ResumenService {
   private readonly gastosService = inject(GastosService);
   private readonly ingresosService = inject(IngresosService);
   private readonly inversionesService = inject(InversionesService);
+  private readonly filtroAnio = inject(FiltroAnioService);
 
   readonly mensuales = computed(() => this.calcular());
 
@@ -24,39 +26,54 @@ export class ResumenService {
     rango: RangoResumen,
     all = this.mensuales()
   ): ResumenMensual[] {
-    if (rango === 'todo' || !all.length) {
-      return all;
+    const yearFilter = this.filtroAnio.year();
+    const scoped =
+      yearFilter == null
+        ? all
+        : all.filter((r) => r.mesKey.startsWith(`${yearFilter}-`));
+
+    if (rango === 'todo' || !scoped.length) {
+      return scoped;
     }
+
+    const refYear = this.filtroAnio.referenceYear();
     const now = currentYearMonth();
-    const [y, m] = now.split('-').map(Number);
+    const [, currentMonth] = now.split('-').map(Number);
+    const refMonth =
+      yearFilter == null || yearFilter === Number(now.slice(0, 4))
+        ? currentMonth
+        : 12;
+    const refYm = `${refYear}-${String(refMonth).padStart(2, '0')}`;
 
     if (rango === 'mes') {
-      return all.filter((r) => r.mesKey === now);
+      const hit = scoped.find((r) => r.mesKey === refYm);
+      if (hit) return [hit];
+      return scoped.length ? [scoped[scoped.length - 1]] : [];
     }
 
     if (rango === 'trimestre') {
-      const startMonth = Math.floor((m - 1) / 3) * 3 + 1;
+      const startMonth = Math.floor((refMonth - 1) / 3) * 3 + 1;
       const keys = [0, 1, 2].map((i) => {
         const mm = String(startMonth + i).padStart(2, '0');
-        return `${y}-${mm}`;
+        return `${refYear}-${mm}`;
       });
-      return all.filter((r) => keys.includes(r.mesKey));
+      return scoped.filter((r) => keys.includes(r.mesKey));
     }
 
-    // año
-    return all.filter((r) => r.mesKey.startsWith(`${y}-`));
+    return scoped.filter((r) => r.mesKey.startsWith(`${refYear}-`));
   }
 
   gastosPorCategoria(rango: RangoResumen): { label: string; value: number }[] {
     const filtered = this.filtrarPorRango(rango);
     const monthSet =
-      rango === 'todo'
+      rango === 'todo' && this.filtroAnio.year() == null
         ? null
         : new Set(filtered.map((r) => r.mesKey));
 
     const map: Record<string, number> = {};
     for (const g of this.gastosService.gastos()) {
       const ym = yearMonthKey(g.fecha);
+      if (!this.filtroAnio.matchesYearMonth(ym)) continue;
       if (monthSet && !monthSet.has(ym)) {
         continue;
       }
@@ -80,7 +97,7 @@ export class ResumenService {
     const ahorroNeto = ingresos - gastos;
     const porcentajeAhorro = ingresos > 0 ? ahorroNeto / ingresos : 0;
 
-    const year = currentYearMonth().slice(0, 4);
+    const year = String(this.filtroAnio.referenceYear());
     const ytdOps = this.inversionesService
       .cerradas()
       .filter((o) => (o.fechaVenta ?? o.fechaOperacion).startsWith(year));

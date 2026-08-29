@@ -10,6 +10,6 @@ import { UserSessionService } from './core/services/user-session.service';
   styles: `:host { display: block; height: 100%; }`,
 })
 export class AppComponent {
-  /** Inicializa el vínculo usuario ↔ datos en localStorage. */
+  /** Inicializa el vínculo usuario ↔ datos en Firestore. */
   private readonly _session = inject(UserSessionService);
 }

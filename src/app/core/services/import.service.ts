@@ -1,16 +1,17 @@
 import { Injectable, inject } from '@angular/core';
 import * as XLSX from 'xlsx';
 import {
-  CATEGORIAS_GASTO,
-  CATEGORIAS_INGRESO,
-  CategoriaGasto,
-  CategoriaIngreso,
   GastoInput,
   IngresoInput,
   OperacionBolsaInput,
 } from '../models';
 import { parseFlexibleDate } from '../utils/date.utils';
 import { clasificarGastoExcel, contarColumnasGastoExcel, esColumnaGastoExcel } from '../utils/gasto-categorias.utils';
+import {
+  isTradeRepublicExport,
+  parseTradeRepublicRows,
+} from '../utils/trade-republic.utils';
+import { CategoriasConfigService } from './categorias-config.service';
 import { GastosService } from './gastos.service';
 import { IngresosService } from './ingresos.service';
 import { InversionesService } from './inversiones.service';
@@ -28,6 +29,15 @@ export interface ImportResult {
   issues: ImportIssue[];
 }
 
+export interface ImportPreview {
+  gastos: GastoInput[];
+  ingresos: IngresoInput[];
+  operaciones: OperacionBolsaInput[];
+  issues: ImportIssue[];
+  source: 'trade-republic' | 'excel';
+  fileName: string;
+}
+
 type Row = Record<string, unknown>;
 
 @Injectable({ providedIn: 'root' })
@@ -35,8 +45,32 @@ export class ImportService {
   private readonly gastosService = inject(GastosService);
   private readonly ingresosService = inject(IngresosService);
   private readonly inversionesService = inject(InversionesService);
+  private readonly categoriasConfig = inject(CategoriasConfigService);
+
+  private get catConfig() {
+    return this.categoriasConfig.config();
+  }
+
+  async previewFile(file: File): Promise<ImportPreview> {
+    const parsed = await this.parseWorkbook(file);
+    return { ...parsed, fileName: file.name };
+  }
+
+  commitPreview(preview: ImportPreview): ImportResult {
+    return {
+      gastos: this.gastosService.importMany(preview.gastos, true),
+      ingresos: this.ingresosService.importMany(preview.ingresos, true),
+      operaciones: this.inversionesService.importMany(preview.operaciones, true),
+      issues: preview.issues,
+    };
+  }
 
   async importFile(file: File): Promise<ImportResult> {
+    const preview = await this.previewFile(file);
+    return this.commitPreview(preview);
+  }
+
+  private async parseWorkbook(file: File): Promise<Omit<ImportPreview, 'fileName'>> {
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, {
       type: 'array',
@@ -50,11 +84,26 @@ export class ImportService {
     let ingresos: IngresoInput[] = [];
     let operaciones: OperacionBolsaInput[] = [];
     let transaccionesParsed = false;
+    let source: ImportPreview['source'] = 'excel';
 
     for (const sheetName of workbook.SheetNames) {
       const sheet = workbook.Sheets[sheetName];
       const rows = this.rowsFromSheet(sheet);
       if (!rows.length) continue;
+
+      if (isTradeRepublicExport(rows[0])) {
+        source = 'trade-republic';
+        const tr = parseTradeRepublicRows(rows, this.catConfig);
+        gastos = gastos.concat(tr.gastos);
+        ingresos = ingresos.concat(tr.ingresos);
+        operaciones = operaciones.concat(tr.operaciones);
+        issues.push({
+          sheet: sheetName,
+          row: 0,
+          message: `Exportación Trade Republic: ${tr.gastos.length} gastos, ${tr.ingresos.length} ingresos, ${tr.operaciones.length} operaciones.`,
+        });
+        continue;
+      }
 
       const kind = this.detectSheetKind(sheetName, rows[0]);
       issues.push({
@@ -153,13 +202,7 @@ export class ImportService {
       }
     }
 
-    // Cada importación sobrescribe siempre gastos, ingresos y operaciones.
-    return {
-      gastos: this.gastosService.importMany(gastos, true),
-      ingresos: this.ingresosService.importMany(ingresos, true),
-      operaciones: this.inversionesService.importMany(operaciones, true),
-      issues,
-    };
+    return { gastos, ingresos, operaciones, issues, source };
   }
 
   /** Localiza la fila de cabeceras aunque haya títulos encima. */
@@ -195,9 +238,9 @@ export class ImportService {
       const hasInversion = cells.some(
         (c) => c === 'inversion' || c.startsWith('inversion ')
       );
-      const gastoColsHere = contarColumnasGastoExcel(rawCells);
+      const gastoColsHere = contarColumnasGastoExcel(rawCells, this.catConfig);
       const nextRaw = (aoa[i + 1] ?? []).map((c) => String(c ?? '').trim());
-      const gastoColsNext = contarColumnasGastoExcel(nextRaw);
+      const gastoColsNext = contarColumnasGastoExcel(nextRaw, this.catConfig);
       const ingresoColsHere = rawCells.filter((c) =>
         this.matchCategoriaIngreso(c)
       ).length;
@@ -384,7 +427,7 @@ export class ImportService {
     let catCols = 0;
     for (const key of Object.keys(sample)) {
       if (this.isGastoMetaColumn(key)) continue;
-      if (esColumnaGastoExcel(key)) {
+      if (esColumnaGastoExcel(key, this.catConfig)) {
         catCols++;
       }
     }
@@ -438,7 +481,7 @@ export class ImportService {
     const parentsWithSubs = new Set<string>();
     for (const key of sampleKeys) {
       if (this.isGastoMetaColumn(key)) continue;
-      const { categoria, subcategoria } = clasificarGastoExcel(key, '');
+      const { categoria, subcategoria } = clasificarGastoExcel(key, '', this.catConfig);
       if (subcategoria) parentsWithSubs.add(categoria);
     }
 
@@ -459,9 +502,9 @@ export class ImportService {
       let added = 0;
       for (const [col, rawVal] of Object.entries(row)) {
         if (this.isGastoMetaColumn(col)) continue;
-        if (!esColumnaGastoExcel(col)) continue;
+        if (!esColumnaGastoExcel(col, this.catConfig)) continue;
 
-        const { categoria, subcategoria } = clasificarGastoExcel(col, '');
+        const { categoria, subcategoria } = clasificarGastoExcel(col, '', this.catConfig);
         // Si hay desglose por subcategoría, no importar el total de la categoría
         if (!subcategoria && parentsWithSubs.has(categoria)) continue;
 
@@ -537,7 +580,7 @@ export class ImportService {
           'detalle categoría',
         ]) ?? ''
       ).trim();
-      const { categoria, subcategoria } = clasificarGastoExcel(catRaw, subRaw);
+      const { categoria, subcategoria } = clasificarGastoExcel(catRaw, subRaw, this.catConfig);
 
       if (!fecha || importe == null) {
         if (fecha || importe != null || catRaw || subRaw) {
@@ -762,7 +805,7 @@ export class ImportService {
         return;
       }
 
-      const { categoria, subcategoria } = clasificarGastoExcel(catRaw, '');
+      const { categoria, subcategoria } = clasificarGastoExcel(catRaw, '', this.catConfig);
       gastos.push({
         fecha,
         importe: Math.abs(importe),
@@ -779,7 +822,7 @@ export class ImportService {
   private esCategoriaGasto(raw: string): boolean {
     if (!raw.trim()) return false;
     if (this.matchCategoriaGasto(raw)) return true;
-    const { subcategoria } = clasificarGastoExcel(raw, '');
+    const { subcategoria } = clasificarGastoExcel(raw, '', this.catConfig);
     return subcategoria != null;
   }
 
@@ -930,7 +973,7 @@ export class ImportService {
           'subtipo',
         ]) ?? ''
       ).trim();
-      const { categoria, subcategoria } = clasificarGastoExcel(catRaw, subRaw);
+      const { categoria, subcategoria } = clasificarGastoExcel(catRaw, subRaw, this.catConfig);
       gastos.push({
         fecha,
         importe: Math.abs(importe),
@@ -1188,93 +1231,57 @@ export class ImportService {
     );
   }
 
-  private matchCategoriaGasto(raw: string): CategoriaGasto | null {
+  private matchCategoriaGasto(raw: string): string | null {
     const n = this.norm(raw);
     if (!n) return null;
-    const found = CATEGORIAS_GASTO.find((c) => this.norm(c) === n);
+    const cats = this.categoriasConfig.categoriasGasto();
+    const found = cats.find((c) => this.norm(c) === n);
     if (found) return found;
-    if (n.includes('ocio') || n.includes('hobby') || n.includes('deporte'))
-      return 'Ocio';
-    if (n.includes('viaje') || n.includes('hotel') || n.includes('vuelo'))
-      return 'Viajes';
-    if (
-      n.includes('comida') ||
-      n.includes('aliment') ||
-      n.includes('restaur') ||
-      n.includes('super') ||
-      n.includes('mercado') ||
-      n.includes('compra')
-    )
-      return 'Comida';
-    if (
-      n.includes('bebida') ||
-      n.includes('bar') ||
-      n.includes('cafe') ||
-      n.includes('alcohol')
-    )
-      return 'Bebida';
-    if (
-      n.includes('transport') ||
-      n.includes('metro') ||
-      n.includes('gasolina') ||
-      n.includes('parking') ||
-      n.includes('taxi') ||
-      n.includes('uber') ||
-      n.includes('coche')
-    )
-      return 'Transporte';
-    if (
-      n.includes('propio') ||
-      n.includes('personal') ||
-      n.includes('hogar') ||
-      n.includes('salud') ||
-      n.includes('farmac') ||
-      n.includes('ropa') ||
-      n.includes('varios')
-    )
-      return 'Gastos propios';
+
+    const { categoria } = clasificarGastoExcel(raw, '', this.catConfig);
+    if (cats.includes(categoria)) return categoria;
     return null;
   }
 
-  /** En hojas de gastos, si no reconoce la categoría, la mete en Gastos propios. */
-  private resolveCategoriaGasto(raw: string): CategoriaGasto {
-    return this.matchCategoriaGasto(raw) ?? 'Gastos propios';
+  private resolveCategoriaGasto(raw: string): string {
+    return (
+      this.matchCategoriaGasto(raw) ?? this.categoriasConfig.categoriaGastoFallback()
+    );
   }
 
-  private matchCategoriaIngreso(raw: string): CategoriaIngreso | null {
+  private matchCategoriaIngreso(raw: string): string | null {
     const n = this.norm(raw);
     if (!n) return null;
-    const found = CATEGORIAS_INGRESO.find((c) => this.norm(c) === n);
+    const cats = this.categoriasConfig.categoriasIngreso();
+    const found = cats.find((c) => this.norm(c) === n);
     if (found) return found;
 
     if (n.includes('nomina') || n.includes('sueldo') || n.includes('salario')) {
-      return 'Nómina';
+      return cats.find((c) => this.norm(c).includes('nomina')) ?? null;
     }
     if (n.includes('flexib') || n.includes('retrib') || n.includes('ticket')) {
-      return 'Retribución flexible';
+      return cats.find((c) => this.norm(c).includes('flex')) ?? null;
     }
-    // «Ret. Flexible» del Excel
     if (n === 'ret flexible' || n.startsWith('ret ')) {
-      return 'Retribución flexible';
+      return cats.find((c) => this.norm(c).includes('flex')) ?? null;
     }
     if (
-      n === 'venta inversiones' ||
-      n === 'venta inversion' ||
-      n === 'venta de inversiones' ||
-      n === 'venta de inversion' ||
-      /^venta\s+de?\s*inversiones?$/.test(n) ||
-      (n.includes('venta') && n.includes('invers'))
+      n.includes('venta') &&
+      (n.includes('invers') || n.includes('bolsa'))
     ) {
-      return 'Venta Inversiones';
+      return cats.find((c) => this.norm(c).includes('venta')) ?? null;
     }
     if (n === 'otros' || n === 'otro') {
-      return 'Otros';
+      return cats.find((c) => this.norm(c).includes('otro')) ?? null;
     }
     return null;
   }
 
-  private resolveCategoriaIngreso(raw: string): CategoriaIngreso {
-    return this.matchCategoriaIngreso(raw) ?? 'Otros';
+  private resolveCategoriaIngreso(raw: string): string {
+    return (
+      this.matchCategoriaIngreso(raw) ??
+      this.categoriasConfig.categoriaIngresoFallback()
+    );
   }
 
   private pick(row: Row, aliases: string[]): unknown {

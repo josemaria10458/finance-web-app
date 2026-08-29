@@ -1,15 +1,16 @@
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import {
-  CATEGORIAS_INGRESO,
   CategoriaIngreso,
   Ingreso,
 } from '../../core/models';
+import { CategoriasConfigService } from '../../core/services/categorias-config.service';
+import { FiltroAnioService } from '../../core/services/filtro-anio.service';
 import { IngresosService } from '../../core/services/ingresos.service';
 import {
   formatMesLabel,
@@ -21,15 +22,21 @@ import {
   IngresoFormDialogData,
 } from './ingreso-form-dialog.component';
 
-const CATEGORY_META: Record<
-  CategoriaIngreso,
-  { tone: string; icon: string }
-> = {
+const CATEGORY_META: Record<string, { tone: string; icon: string }> = {
   Nómina: { tone: '#1f6f66', icon: 'account_balance' },
   'Retribución flexible': { tone: '#3b6ea5', icon: 'card_giftcard' },
   Otros: { tone: '#c47a3a', icon: 'payments' },
   'Venta Inversiones': { tone: '#2f9b8f', icon: 'trending_up' },
 };
+
+const CATEGORY_PALETTE = [
+  '#1f6f66',
+  '#3b6ea5',
+  '#c47a3a',
+  '#2f9b8f',
+  '#2563eb',
+  '#b54a3a',
+];
 
 @Component({
   selector: 'app-ingresos',
@@ -49,21 +56,30 @@ const CATEGORY_META: Record<
 })
 export class IngresosComponent {
   private readonly ingresosService = inject(IngresosService);
+  private readonly categoriasConfig = inject(CategoriasConfigService);
+  private readonly filtroAnio = inject(FiltroAnioService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
 
-  readonly categorias = CATEGORIAS_INGRESO;
+  readonly categorias = this.categoriasConfig.categoriasIngreso;
 
   readonly mesFiltro = signal<string | null>(null);
   readonly categoriaFiltro = signal<CategoriaIngreso | 'todas'>('todas');
 
-  readonly mesesDisponibles = computed(() =>
-    buildMonthOptions(this.ingresosService.availableYearMonths())
-  );
+  readonly mesesDisponibles = computed(() => {
+    const months = buildMonthOptions(
+      this.ingresosService.availableYearMonths()
+    );
+    const year = this.filtroAnio.year();
+    if (year == null) return months;
+    return months.filter((m) => m.startsWith(`${year}-`));
+  });
 
   readonly ingresosFiltrados = computed(() => {
     this.ingresosService.ingresos();
+    this.filtroAnio.year();
     let list = this.ingresosService.byYearMonth(this.mesFiltro());
+    list = list.filter((i) => this.filtroAnio.matchesDate(i.fecha));
     const cat = this.categoriaFiltro();
     if (cat !== 'todas') {
       list = list.filter((i) => i.categoria === cat);
@@ -73,8 +89,10 @@ export class IngresosComponent {
 
   readonly totalMes = computed(() => {
     this.ingresosService.ingresos();
+    this.filtroAnio.year();
     return this.ingresosService
       .byYearMonth(this.mesFiltro())
+      .filter((i) => this.filtroAnio.matchesDate(i.fecha))
       .reduce((s, i) => s + i.importe, 0);
   });
 
@@ -84,11 +102,21 @@ export class IngresosComponent {
 
   readonly cartasCategoria = computed(() => {
     this.ingresosService.ingresos();
-    const map = this.ingresosService.totalsByCategoria(this.mesFiltro());
+    this.filtroAnio.year();
+    this.categoriasConfig.config();
+    const map: Record<string, number> = {};
+    for (const i of this.ingresosService
+      .byYearMonth(this.mesFiltro())
+      .filter((x) => this.filtroAnio.matchesDate(x.fecha))) {
+      map[i.categoria] = (map[i.categoria] ?? 0) + i.importe;
+    }
     const totalMes = this.totalMes();
-    return CATEGORIAS_INGRESO.map((categoria) => {
+    return this.categoriasConfig.categoriasIngreso().map((categoria, index) => {
       const total = map[categoria] ?? 0;
-      const meta = CATEGORY_META[categoria];
+      const meta = CATEGORY_META[categoria] ?? {
+        tone: CATEGORY_PALETTE[index % CATEGORY_PALETTE.length],
+        icon: 'payments',
+      };
       return {
         categoria,
         total,
@@ -99,12 +127,25 @@ export class IngresosComponent {
     }).sort((a, b) => b.total - a.total);
   });
 
-  tone(categoria: string): string {
-    return CATEGORY_META[categoria as CategoriaIngreso]?.tone ?? '#1f6f66';
+  constructor() {
+    effect(() => {
+      const year = this.filtroAnio.year();
+      const mes = this.mesFiltro();
+      if (year != null && mes && !mes.startsWith(`${year}-`)) {
+        this.mesFiltro.set(null);
+      }
+    });
+  }
+
+  tone(categoria: string, index = 0): string {
+    return (
+      CATEGORY_META[categoria]?.tone ??
+      CATEGORY_PALETTE[index % CATEGORY_PALETTE.length]
+    );
   }
 
   icon(categoria: string): string {
-    return CATEGORY_META[categoria as CategoriaIngreso]?.icon ?? 'payments';
+    return CATEGORY_META[categoria]?.icon ?? 'payments';
   }
 
   labelMes(ym: string): string {

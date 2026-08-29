@@ -1,15 +1,4 @@
-export type CategoriaIngreso =
-  | 'Nómina'
-  | 'Retribución flexible'
-  | 'Otros'
-  | 'Venta Inversiones';
-
-export const CATEGORIAS_INGRESO: CategoriaIngreso[] = [
-  'Nómina',
-  'Retribución flexible',
-  'Otros',
-  'Venta Inversiones',
-];
+export type CategoriaIngreso = string;
 
 export interface Ingreso {
   id: string;

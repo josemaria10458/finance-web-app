@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../core/services/auth.service';
+import { UserSessionService } from '../../core/services/user-session.service';
 
 @Component({
   selector: 'app-login',
@@ -12,6 +13,7 @@ import { AuthService } from '../../core/services/auth.service';
 })
 export class LoginComponent {
   private readonly auth = inject(AuthService);
+  private readonly session = inject(UserSessionService);
   private readonly router = inject(Router);
 
   readonly busy = signal(false);
@@ -22,7 +24,12 @@ export class LoginComponent {
     this.error.set(null);
     try {
       await this.auth.signInWithGoogle();
-      await this.router.navigate(['/gastos']);
+      await this.session.waitUntilDataReady();
+      await this.router.navigate([
+        this.session.needsInitialSetup()
+          ? '/configuracion-inicial'
+          : '/gastos',
+      ]);
     } catch (e) {
       console.error(e);
       this.error.set('No se pudo iniciar sesión con Google. Revisa la configuración de Firebase.');

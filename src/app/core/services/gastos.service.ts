@@ -1,15 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import {
-  CategoriaGasto,
-  Gasto,
-  GastoInput,
-  SUBCATEGORIAS_POR_CATEGORIA,
-  subcategoriasDe,
-} from '../models';
+import { Gasto, GastoInput } from '../models';
 import { yearMonthKey } from '../utils/date.utils';
-import { StorageService } from './storage.service';
-
-const STORAGE_BASE = 'finanzas.gastos';
+import { CategoriasConfigService } from './categorias-config.service';
+import { UserFirestoreService } from './user-firestore.service';
 
 export interface SubcategoriaTotal {
   subcategoria: string;
@@ -18,7 +11,8 @@ export interface SubcategoriaTotal {
 
 @Injectable({ providedIn: 'root' })
 export class GastosService {
-  private readonly storage = inject(StorageService);
+  private readonly firestore = inject(UserFirestoreService);
+  private readonly categorias = inject(CategoriasConfigService);
   private uid: string | null = null;
   private readonly _gastos = signal<Gasto[]>([]);
 
@@ -28,15 +22,17 @@ export class GastosService {
     this._gastos().reduce((sum, g) => sum + g.importe, 0)
   );
 
-  bindUser(uid: string | null): void {
+  setUid(uid: string | null): void {
     this.uid = uid;
-    if (!uid) {
-      this._gastos.set([]);
-      return;
-    }
-    const userKey = this.storage.keyFor(STORAGE_BASE, uid);
-    const migrated = this.storage.migrateLegacy<Gasto[]>(STORAGE_BASE, userKey);
-    this._gastos.set(migrated ?? this.storage.read(userKey, []));
+  }
+
+  clearUser(): void {
+    this.uid = null;
+    this._gastos.set([]);
+  }
+
+  hydrate(gastos: Gasto[]): void {
+    this._gastos.set(gastos);
   }
 
   list(): Gasto[] {
@@ -93,9 +89,9 @@ export class GastosService {
 
   totalsBySubcategoria(
     yearMonth: string | null,
-    categoria: CategoriaGasto
+    categoria: string
   ): SubcategoriaTotal[] {
-    const canon = subcategoriasDe(categoria);
+    const canon = this.categorias.subcategoriasDe(categoria);
     if (!canon.length) return [];
 
     const map = new Map<string, number>();
@@ -117,8 +113,8 @@ export class GastosService {
     return out.sort((a, b) => b.total - a.total);
   }
 
-  categoriaTieneSubcategoriasDefinidas(categoria: CategoriaGasto): boolean {
-    return SUBCATEGORIAS_POR_CATEGORIA[categoria].length > 0;
+  categoriaTieneSubcategoriasDefinidas(categoria: string): boolean {
+    return this.categorias.categoriaTieneSubcategorias(categoria);
   }
 
   availableYearMonths(): string[] {
@@ -129,7 +125,7 @@ export class GastosService {
   private persist(gastos: Gasto[]): void {
     this._gastos.set(gastos);
     if (this.uid) {
-      this.storage.write(this.storage.keyFor(STORAGE_BASE, this.uid), gastos);
+      void this.firestore.patch(this.uid, { gastos });
     }
   }
 }

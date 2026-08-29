@@ -11,15 +11,18 @@ import {
   MatDialogRef,
 } from '@angular/material/dialog';
 import {
-  CATEGORIAS_INGRESO,
   CategoriaIngreso,
   Ingreso,
+  IngresoInput,
 } from '../../core/models';
+import { CategoriasConfigService } from '../../core/services/categorias-config.service';
 import { IngresosService } from '../../core/services/ingresos.service';
 import { todayIso } from '../../core/utils/date.utils';
 
 export interface IngresoFormDialogData {
   ingreso?: Ingreso;
+  draft?: IngresoInput;
+  previewMode?: boolean;
 }
 
 @Component({
@@ -27,7 +30,13 @@ export interface IngresoFormDialogData {
   standalone: true,
   imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule],
   template: `
-    <h2 mat-dialog-title>{{ data.ingreso ? 'Editar ingreso' : 'Nuevo ingreso' }}</h2>
+    <h2 mat-dialog-title>
+      {{
+        data.previewMode || data.ingreso
+          ? 'Editar ingreso'
+          : 'Nuevo ingreso'
+      }}
+    </h2>
     <mat-dialog-content>
       <form [formGroup]="form" class="form" (ngSubmit)="guardar()">
         <label class="field">
@@ -55,7 +64,7 @@ export interface IngresoFormDialogData {
         <label class="field">
           <span>Categoría</span>
           <select formControlName="categoria">
-            @for (c of categorias; track c) {
+            @for (c of categorias(); track c) {
               <option [value]="c">{{ c }}</option>
             }
           </select>
@@ -120,21 +129,26 @@ export class IngresoFormDialogComponent {
   private readonly dialogRef = inject(MatDialogRef<IngresoFormDialogComponent>);
   private readonly fb = inject(FormBuilder);
   private readonly ingresosService = inject(IngresosService);
+  private readonly categoriasConfig = inject(CategoriasConfigService);
 
-  readonly categorias = CATEGORIAS_INGRESO;
+  readonly categorias = this.categoriasConfig.categoriasIngreso;
+
+  private readonly initial = this.data.ingreso ?? this.data.draft;
 
   readonly form = this.fb.nonNullable.group({
-    fecha: [this.data.ingreso?.fecha ?? todayIso(), Validators.required],
+    fecha: [this.initial?.fecha ?? todayIso(), Validators.required],
     importe: [
-      this.data.ingreso?.importe ?? (null as number | null),
+      this.initial?.importe ?? (null as number | null),
       [Validators.required, Validators.min(0.01)],
     ],
     descripcion: [
-      this.data.ingreso?.descripcion ?? '',
+      this.initial?.descripcion ?? '',
       [Validators.required, Validators.maxLength(120)],
     ],
     categoria: [
-      this.data.ingreso?.categoria ?? ('Nómina' as CategoriaIngreso),
+      this.initial?.categoria ??
+        this.categoriasConfig.categoriasIngreso()[0] ??
+        '',
       Validators.required,
     ],
   });
@@ -151,6 +165,11 @@ export class IngresoFormDialogComponent {
       descripcion: raw.descripcion.trim(),
       categoria: raw.categoria,
     };
+
+    if (this.data.previewMode) {
+      this.dialogRef.close(input);
+      return;
+    }
 
     if (this.data.ingreso) {
       this.ingresosService.update(this.data.ingreso.id, input);
