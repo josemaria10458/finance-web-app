@@ -36,8 +36,12 @@ jobs:
       - name: Build for GitHub Pages
         run: npm run build:pages
 
-      - name: Prepare SPA fallback for GitHub Pages
-        run: cp dist/finance-web-app/browser/index.html dist/finance-web-app/browser/404.html
+      - name: Prepare GitHub Pages output
+        run: |
+          OUT=dist/finance-web-app/browser
+          test -f "$OUT/index.html" || (echo "Missing index.html in build output" && exit 1)
+          cp "$OUT/index.html" "$OUT/404.html"
+          touch "$OUT/.nojekyll"
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
