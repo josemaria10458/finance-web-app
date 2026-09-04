@@ -16,14 +16,17 @@ import {
   GastoInput,
 } from '../../core/models';
 import { CategoriasConfigService } from '../../core/services/categorias-config.service';
+import { FiltroAnioService } from '../../core/services/filtro-anio.service';
 import { GastosService } from '../../core/services/gastos.service';
-import { todayIso } from '../../core/utils/date.utils';
+import { defaultFechaParaVista } from '../../core/utils/date.utils';
 
 export interface GastoFormDialogData {
   gasto?: Gasto;
   /** Borrador de importación (sin id); no persiste al guardar. */
   draft?: GastoInput;
   previewMode?: boolean;
+  /** YYYY-MM del filtro de la pantalla de gastos, si hay uno activo. */
+  yearMonth?: string | null;
 }
 
 @Component({
@@ -138,11 +141,13 @@ export interface GastoFormDialogData {
   `,
 })
 export class GastoFormDialogComponent {
-  readonly data = inject<GastoFormDialogData>(MAT_DIALOG_DATA);
+  readonly data: GastoFormDialogData =
+    inject<GastoFormDialogData>(MAT_DIALOG_DATA, { optional: true }) ?? {};
   private readonly dialogRef = inject(MatDialogRef<GastoFormDialogComponent>);
   private readonly fb = inject(FormBuilder);
   private readonly gastosService = inject(GastosService);
   private readonly categoriasConfig = inject(CategoriasConfigService);
+  private readonly filtroAnio = inject(FiltroAnioService);
 
   readonly categorias = this.categoriasConfig.categoriasGasto;
 
@@ -151,7 +156,11 @@ export class GastoFormDialogComponent {
     this.initial?.categoria ?? this.categoriasConfig.categoriasGasto()[0] ?? '';
 
   readonly form = this.fb.nonNullable.group({
-    fecha: [this.initial?.fecha ?? todayIso(), Validators.required],
+    fecha: [
+      this.initial?.fecha ??
+        defaultFechaParaVista(this.filtroAnio.year(), this.data.yearMonth),
+      Validators.required,
+    ],
     importe: [
       this.initial?.importe ?? (null as number | null),
       [Validators.required, Validators.min(0.01)],
@@ -190,15 +199,23 @@ export class GastoFormDialogComponent {
       return;
     }
     const raw = this.form.getRawValue();
+    const importe = Number(raw.importe);
+    if (!Number.isFinite(importe) || importe < 0.01) {
+      this.form.controls.importe.setErrors({ min: true });
+      this.form.markAllAsTouched();
+      return;
+    }
     const subs = this.categoriasConfig.subcategoriasDe(raw.categoria);
-    const input = {
+    const sub = raw.subcategoria?.trim();
+    const input: GastoInput = {
       fecha: raw.fecha,
-      importe: Number(raw.importe),
+      importe,
       descripcion: raw.descripcion.trim(),
       categoria: raw.categoria,
-      subcategoria:
-        subs.length && raw.subcategoria ? raw.subcategoria : undefined,
     };
+    if (subs.length && sub) {
+      input.subcategoria = sub;
+    }
 
     if (this.data.previewMode) {
       this.dialogRef.close(input);
