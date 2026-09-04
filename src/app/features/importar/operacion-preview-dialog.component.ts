@@ -121,7 +121,8 @@ export interface OperacionPreviewDialogData {
       display: flex;
       flex-direction: column;
       gap: 0.85rem;
-      min-width: min(100%, 360px);
+      min-width: 0;
+      width: 100%;
       padding: 0.35rem 0 0.5rem;
     }
     .grid-2 {

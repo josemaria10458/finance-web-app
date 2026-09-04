@@ -51,7 +51,8 @@ import { CompraFormDialogComponent } from '../../../features/inversiones/compra-
       flex-direction: column;
       gap: 0.55rem;
       padding: 0.35rem 0 0.5rem;
-      min-width: min(100%, 320px);
+      min-width: 0;
+      width: 100%;
     }
     .choice {
       display: flex;

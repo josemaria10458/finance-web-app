@@ -104,7 +104,7 @@
   align-items: center;
   gap: 0.75rem;
   flex: 1 1 calc(50% - 0.45rem);
-  min-width: min(100%, 220px);
+  min-width: 0;
   max-width: calc(50% - 0.45rem);
   padding: 20px;
   border-radius: 14px;
@@ -117,6 +117,14 @@
   transition: border-color 0.2s, transform 0.2s var(--ease-out),
     background 0.2s;
   animation: rise 0.4s var(--ease-out) both;
+}
+
+@media (max-width: 560px) {
+  .cat-card {
+    flex: 1 1 100%;
+    max-width: 100%;
+    padding: 0.9rem 1rem;
+  }
 }
 
 @media (min-width: 720px) {
@@ -365,5 +373,14 @@
   .btn-primary {
     width: 100%;
     justify-content: center;
+  }
+
+  .filters {
+    grid-template-columns: 1fr;
+  }
+
+  .list-head {
+    flex-wrap: wrap;
+    gap: 0.35rem;
   }
 }

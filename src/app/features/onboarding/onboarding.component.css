@@ -176,6 +176,36 @@
   gap: 0.75rem;
 }
 
+@media (max-width: 560px) {
+  .onboarding-page {
+    padding: 1rem 0.75rem calc(1.5rem + env(safe-area-inset-bottom));
+  }
+
+  .head {
+    flex-direction: column;
+  }
+
+  .head h1 {
+    font-size: 1.35rem;
+  }
+
+  .add-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .actions,
+  .actions-split {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .btn-primary,
+  .btn-back {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .btn-back {
   display: inline-flex;
   align-items: center;

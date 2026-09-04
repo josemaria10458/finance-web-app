@@ -38,6 +38,8 @@ Chart.register(...registerables);
       border: 1px solid var(--line);
       backdrop-filter: blur(8px);
       min-height: 280px;
+      min-width: 0;
+      overflow: hidden;
     }
     h3 {
       margin: 0;
@@ -50,7 +52,9 @@ Chart.register(...registerables);
     .canvas-wrap {
       position: relative;
       flex: 1;
-      min-height: 220px;
+      min-height: 200px;
+      min-width: 0;
+      overflow: hidden;
     }
     canvas {
       width: 100% !important;

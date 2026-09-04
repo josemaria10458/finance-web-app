@@ -110,7 +110,8 @@ export interface VentaFormDialogData {
       display: flex;
       flex-direction: column;
       gap: 0.85rem;
-      min-width: min(100%, 360px);
+      min-width: 0;
+      width: 100%;
     }
     .field {
       display: flex;

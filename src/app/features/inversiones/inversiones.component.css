@@ -138,12 +138,14 @@
 
 .tabs {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 0.25rem;
   padding: 0.3rem;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.55);
   border: 1px solid var(--line);
   width: fit-content;
+  max-width: 100%;
 }
 
 .toolbar {
@@ -474,6 +476,8 @@
 
 .table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface);
@@ -482,6 +486,7 @@
 
 table {
   width: 100%;
+  min-width: 560px;
   border-collapse: collapse;
   font-size: 0.86rem;
 }
@@ -559,6 +564,7 @@ tbody tr:last-child td {
 
   .tabs {
     width: 100%;
+    display: flex;
   }
 
   .tab {
@@ -582,5 +588,14 @@ tbody tr:last-child td {
 
   .prices {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .field select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .month-toolbar .field {
+    width: 100%;
   }
 }

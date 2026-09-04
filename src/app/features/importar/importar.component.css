@@ -158,6 +158,34 @@
   .counts {
     grid-template-columns: 1fr 1fr;
   }
+
+  .dropzone {
+    padding: 1.6rem 1rem;
+  }
+
+  .preview {
+    padding: 1rem;
+  }
+
+  .preview-actions {
+    width: 100%;
+  }
+
+  .preview-actions .btn-primary,
+  .preview-actions .btn-ghost {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .preview .counts {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .counts {
+    grid-template-columns: 1fr;
+  }
 }
 
 .preview {
