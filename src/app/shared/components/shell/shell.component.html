@@ -1,5 +1,9 @@
-<div class="shell" [class.is-mobile]="(isHandset$ | async) === true">
-  <aside class="rail" [class.open]="railOpen() || (isHandset$ | async) === false">
+<div class="shell">
+  <aside
+    class="rail"
+    [class.open]="railOpen()"
+    [attr.aria-hidden]="isCompact() && !railOpen()"
+  >
     <div class="brand">
       <span class="brand-mark" aria-hidden="true"></span>
       <div class="brand-copy">
@@ -48,7 +52,7 @@
     </button>
   </aside>
 
-  @if (railOpen() && (isHandset$ | async)) {
+  @if (railOpen()) {
     <button
       type="button"
       class="scrim"
@@ -59,19 +63,16 @@
 
   <div class="stage">
     <header class="topbar">
-      @if (isHandset$ | async) {
-        <button
-          type="button"
-          class="icon-btn"
-          aria-label="Abrir menú"
-          (click)="railOpen.set(true)"
-        >
-          <mat-icon>menu</mat-icon>
-        </button>
-        <span class="topbar-brand brand-text">Finanzas</span>
-      } @else {
-        <p class="topbar-note">Tu dinero, en un solo sitio</p>
-      }
+      <button
+        type="button"
+        class="icon-btn menu-btn"
+        aria-label="Abrir menú"
+        (click)="railOpen.set(true)"
+      >
+        <mat-icon>menu</mat-icon>
+      </button>
+      <span class="topbar-brand brand-text">Finanzas</span>
+      <p class="topbar-note">Tu dinero, en un solo sitio</p>
       <span class="spacer"></span>
       <label class="year-filter" title="Filtrar por año">
         <mat-icon class="year-icon" aria-hidden="true">calendar_today</mat-icon>
@@ -113,19 +114,17 @@
       <router-outlet />
     </main>
 
-    @if (isHandset$ | async) {
-      <nav class="dock" aria-label="Navegación principal">
-        @for (item of navItems; track item.path) {
-          <a
-            class="dock-item"
-            [routerLink]="item.path"
-            routerLinkActive="active"
-          >
-            <mat-icon>{{ item.icon }}</mat-icon>
-            <span>{{ item.label }}</span>
-          </a>
-        }
-      </nav>
-    }
+    <nav class="dock" aria-label="Navegación principal">
+      @for (item of navItems; track item.path) {
+        <a
+          class="dock-item"
+          [routerLink]="item.path"
+          routerLinkActive="active"
+        >
+          <mat-icon>{{ item.icon }}</mat-icon>
+          <span>{{ item.dockLabel }}</span>
+        </a>
+      }
+    </nav>
   </div>
 </div>

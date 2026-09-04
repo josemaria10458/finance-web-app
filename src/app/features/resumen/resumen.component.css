@@ -1,5 +1,6 @@
 .range {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 0.25rem;
   padding: 0.3rem;
   border-radius: 14px;
@@ -74,6 +75,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.85rem;
+  min-width: 0;
 }
 
 .charts .wide,
@@ -115,10 +117,14 @@
 
   .range {
     width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .range-btn {
     flex: 1;
+    text-align: center;
+    padding: 0.55rem 0.4rem;
   }
 
   .kpi-grid {

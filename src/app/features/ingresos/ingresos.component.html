@@ -85,7 +85,9 @@
             </span>
             <span class="row-body">
               <span class="row-top">
-                <span class="desc">{{ i.descripcion }}</span>
+                <span class="desc ellipsis" [title]="i.descripcion">{{
+                  i.descripcion
+                }}</span>
                 <span class="amount positive"
                   >{{ i.importe | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</span
                 >
