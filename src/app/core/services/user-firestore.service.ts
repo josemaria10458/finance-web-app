@@ -85,14 +85,11 @@ export class UserFirestoreService {
     partial: Partial<UserDataSnapshot>
   ): Promise<void> {
     const ref = doc(this.db, USERS_COLLECTION, uid);
-    await setDoc(
-      ref,
-      {
-        ...partial,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
+    const payload = stripUndefinedDeep({
+      ...partial,
+      updatedAt: serverTimestamp(),
+    }) as Record<string, unknown>;
+    await setDoc(ref, payload, { merge: true });
   }
 
   private emptySnapshot(): UserDataSnapshot {
@@ -234,4 +231,29 @@ export class UserFirestoreService {
       initialSetupCompleted,
     };
   }
+}
+
+/** Firestore rechaza `undefined` (y NaN) en documentos; se omiten antes de escribir. */
+function stripUndefinedDeep(value: unknown): unknown {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value === 'number' && !Number.isFinite(value)) return undefined;
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => stripUndefinedDeep(item))
+      .filter((item) => item !== undefined);
+  }
+  if (typeof value === 'object' && value.constructor === Object) {
+    const out: Record<string, unknown> = {};
+    for (const [key, nested] of Object.entries(
+      value as Record<string, unknown>
+    )) {
+      if (nested === undefined) continue;
+      const cleaned = stripUndefinedDeep(nested);
+      if (cleaned === undefined) continue;
+      out[key] = cleaned;
+    }
+    return out;
+  }
+  return value;
 }

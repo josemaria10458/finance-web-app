@@ -48,28 +48,31 @@
           <strong>{{ c.total | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</strong>
           <span class="cat-pct">{{ c.pct | number: '1.0-0' }} % del mes</span>
         </span>
-        @if (c.tieneSubcategorias && c.subcategorias.length > 0) {
-          <ul class="cat-subs" [attr.aria-label]="'Subcategorías de ' + c.categoria">
-            @for (sub of c.subcategorias; track sub.nombre) {
-              <li>
-                <button
-                  type="button"
-                  class="cat-sub"
-                  [class.active]="subcategoriaActiva(sub.nombre) && categoriaFiltro() === c.categoria"
-                  (click)="seleccionarSubcategoria(c.categoria, sub.nombre, $event)"
-                >
-                  <span class="cat-sub-name">{{ sub.nombre }}</span>
-                  <span class="cat-sub-amount">{{
-                    sub.total | currency: 'EUR' : 'symbol' : '1.2-2' : 'es'
-                  }}</span>
-                </button>
-              </li>
-            }
-          </ul>
-        }
       </button>
     }
   </section>
+
+  @if (subcategoriasVisibles().length) {
+    <div
+      class="sub-filters"
+      [style.--tone]="tone(categoriaFiltro())"
+      [attr.aria-label]="'Subcategorías de ' + categoriaFiltro()"
+    >
+      @for (sub of subcategoriasVisibles(); track sub.nombre) {
+        <button
+          type="button"
+          class="sub-chip"
+          [class.active]="subcategoriaActiva(sub.nombre)"
+          (click)="seleccionarSubcategoria(sub.nombre)"
+        >
+          <span class="sub-chip-name">{{ sub.nombre }}</span>
+          <span class="sub-chip-amount">{{
+            sub.total | currency: 'EUR' : 'symbol' : '1.2-2' : 'es'
+          }}</span>
+        </button>
+      }
+    </div>
+  }
 
   <div class="list-head">
     <h2>

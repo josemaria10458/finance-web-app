@@ -15,6 +15,7 @@ import { GastosService } from '../../core/services/gastos.service';
 import {
   formatMesLabel,
   buildMonthOptions,
+  yearMonthKey,
 } from '../../core/utils/date.utils';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import {
@@ -149,10 +150,17 @@ export class GastosComponent {
         tone: meta.tone,
         icon: meta.icon,
         subcategorias: subs,
-        tieneSubcategorias:
-          this.gastosService.categoriaTieneSubcategoriasDefinidas(categoria),
       };
     }).sort((a, b) => b.total - a.total);
+  });
+
+  readonly subcategoriasVisibles = computed(() => {
+    const cat = this.categoriaFiltro();
+    if (cat === 'todas') return [];
+    return (
+      this.cartasCategoria().find((c) => c.categoria === cat)?.subcategorias ??
+      []
+    );
   });
 
   constructor() {
@@ -191,13 +199,7 @@ export class GastosComponent {
     });
   }
 
-  seleccionarSubcategoria(
-    cat: CategoriaGasto,
-    sub: string,
-    event: Event
-  ): void {
-    event.stopPropagation();
-    this.categoriaFiltro.set(cat);
+  seleccionarSubcategoria(sub: string): void {
     this.subcategoriaFiltro.update((actual) => (actual === sub ? null : sub));
   }
 
@@ -231,7 +233,10 @@ export class GastosComponent {
   }
 
   private openForm(gasto?: Gasto): void {
-    const data: GastoFormDialogData = { gasto };
+    const data: GastoFormDialogData = {
+      gasto,
+      yearMonth: gasto ? undefined : this.mesFiltro(),
+    };
     const ref = this.dialog.open(GastoFormDialogComponent, {
       width: '440px',
       maxWidth: '94vw',
@@ -239,13 +244,27 @@ export class GastosComponent {
       data,
     });
     ref.afterClosed().subscribe((saved) => {
-      if (saved) {
-        this.snackBar.open(
-          gasto ? 'Gasto actualizado' : 'Gasto añadido',
-          'Cerrar',
-          { duration: 2500 }
-        );
-      }
+      if (!saved) return;
+      const id = gasto?.id ?? this.gastosService.gastos()[0]?.id;
+      const visible = this.gastosService.gastos().find((g) => g.id === id);
+      if (visible) this.revelarGasto(visible);
+      this.snackBar.open(
+        gasto ? 'Gasto actualizado' : 'Gasto añadido',
+        'Cerrar',
+        { duration: 2500 }
+      );
     });
+  }
+
+  /** Ajusta año/mes para que el gasto recién guardado no quede oculto por el filtro. */
+  private revelarGasto(gasto: Gasto): void {
+    if (!this.filtroAnio.matchesDate(gasto.fecha)) {
+      const year = Number(gasto.fecha.slice(0, 4));
+      if (Number.isFinite(year)) this.filtroAnio.setYear(year);
+    }
+    const mes = this.mesFiltro();
+    if (mes && yearMonthKey(gasto.fecha) !== mes) {
+      this.mesFiltro.set(yearMonthKey(gasto.fecha));
+    }
   }
 }

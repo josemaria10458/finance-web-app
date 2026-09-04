@@ -32,7 +32,7 @@ export class GastosService {
   }
 
   hydrate(gastos: Gasto[]): void {
-    this._gastos.set(gastos);
+    this._gastos.set(gastos.map((g) => this.normalize(g)));
   }
 
   list(): Gasto[] {
@@ -48,7 +48,7 @@ export class GastosService {
   }
 
   add(input: GastoInput): Gasto {
-    const gasto: Gasto = { ...input, id: crypto.randomUUID() };
+    const gasto = this.normalize({ ...input, id: crypto.randomUUID() });
     this.persist([gasto, ...this._gastos()]);
     return gasto;
   }
@@ -59,7 +59,7 @@ export class GastosService {
     if (idx < 0) {
       return null;
     }
-    const updated: Gasto = { ...input, id };
+    const updated = this.normalize({ ...input, id });
     const next = [...current];
     next[idx] = updated;
     this.persist(next);
@@ -71,10 +71,12 @@ export class GastosService {
   }
 
   importMany(items: GastoInput[], replace = false): number {
-    const nuevos = items.map((input) => ({
-      ...input,
-      id: crypto.randomUUID(),
-    }));
+    const nuevos = items.map((input) =>
+      this.normalize({
+        ...input,
+        id: crypto.randomUUID(),
+      })
+    );
     this.persist(replace ? nuevos : [...nuevos, ...this._gastos()]);
     return nuevos.length;
   }
@@ -123,9 +125,24 @@ export class GastosService {
   }
 
   private persist(gastos: Gasto[]): void {
-    this._gastos.set(gastos);
+    const clean = gastos.map((g) => this.normalize(g));
+    this._gastos.set(clean);
     if (this.uid) {
-      void this.firestore.patch(this.uid, { gastos });
+      void this.firestore.patch(this.uid, { gastos: clean }).catch((err) => {
+        console.error('Error guardando gastos en Firestore', err);
+      });
     }
+  }
+
+  private normalize(gasto: Gasto): Gasto {
+    const sub = gasto.subcategoria?.trim();
+    return {
+      id: gasto.id,
+      fecha: gasto.fecha,
+      importe: gasto.importe,
+      descripcion: gasto.descripcion,
+      categoria: gasto.categoria,
+      ...(sub ? { subcategoria: sub } : {}),
+    };
   }
 }

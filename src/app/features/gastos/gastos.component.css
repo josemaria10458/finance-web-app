@@ -101,7 +101,6 @@
 .cat-card {
   display: flex;
   flex-direction: row;
-  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
   flex: 1 1 calc(50% - 0.45rem);
@@ -198,56 +197,47 @@
   white-space: nowrap;
 }
 
-.cat-subs {
-  list-style: none;
-  margin: 0.15rem 0 0;
-  padding: 0;
-  flex: 1 1 100%;
+.sub-filters {
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  border-top: 1px solid color-mix(in srgb, var(--tone) 18%, var(--line));
-  padding-top: 0.55rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
-.cat-sub {
-  display: flex;
+.sub-chip {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.2rem 0.35rem;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
+  gap: 0.55rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
   color: inherit;
   font: inherit;
   cursor: pointer;
-  text-align: left;
-  transition: background 0.15s;
+  transition: border-color 0.2s, background 0.2s;
 }
 
-.cat-sub:hover,
-.cat-sub.active {
-  background: color-mix(in srgb, var(--tone) 10%, white);
+.sub-chip:hover,
+.sub-chip.active {
+  border-color: color-mix(in srgb, var(--tone) 45%, transparent);
+  background: color-mix(in srgb, var(--tone) 12%, white);
 }
 
-.cat-sub-name {
-  font-size: 0.72rem;
+.sub-chip.active {
+  box-shadow: inset 3px 0 0 var(--tone);
+}
+
+.sub-chip-name {
+  font-size: 0.78rem;
   color: var(--muted);
-  font-weight: 500;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 600;
 }
 
-.cat-sub-amount {
-  font-size: 0.72rem;
-  font-weight: 600;
+.sub-chip-amount {
+  font-size: 0.78rem;
+  font-weight: 700;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 .list-head {

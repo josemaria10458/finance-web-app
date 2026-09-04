@@ -40,6 +40,25 @@ export function todayIso(): string {
   return toIsoDate(new Date());
 }
 
+/**
+ * Fecha por defecto al crear un movimiento para que coincida con el filtro
+ * de año/mes activo y no “desaparezca” al guardar.
+ */
+export function defaultFechaParaVista(
+  year: number | null = null,
+  yearMonth: string | null = null,
+  today = todayIso()
+): string {
+  if (yearMonth) {
+    return today.startsWith(yearMonth) ? today : `${yearMonth}-01`;
+  }
+  if (year != null) {
+    if (today.startsWith(`${year}-`)) return today;
+    return `${year}-${today.slice(5, 7)}-01`;
+  }
+  return today;
+}
+
 export function currentYearMonth(): string {
   return yearMonthKey(todayIso());
 }
