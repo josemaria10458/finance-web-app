@@ -109,7 +109,9 @@
             </span>
             <span class="row-body">
               <span class="row-top">
-                <span class="desc">{{ g.descripcion }}</span>
+                <span class="desc ellipsis" [title]="g.descripcion">{{
+                  g.descripcion
+                }}</span>
                 <span class="amount"
                   >{{ g.importe | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</span
                 >

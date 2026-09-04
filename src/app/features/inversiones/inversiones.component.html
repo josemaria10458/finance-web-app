@@ -241,7 +241,9 @@
               <div class="row-body">
                 <div class="row-top">
                   <span class="desc">
-                    {{ mov.operacion.empresa }}
+                    <span class="ellipsis" [title]="mov.operacion.empresa">{{
+                      mov.operacion.empresa
+                    }}</span>
                     <em class="badge" [class.venta]="mov.tipo === 'venta'">
                       {{ mov.tipo === 'compra' ? 'Compra' : 'Venta' }}
                     </em>
@@ -295,7 +297,7 @@
             <div class="row-body">
               <div class="row-top">
                 <span class="desc">
-                  {{ op.empresa }}
+                  <span class="ellipsis" [title]="op.empresa">{{ op.empresa }}</span>
                   <em class="badge" [class.venta]="op.esVenta">{{ op.esVenta ? 'Venta' : 'Compra' }}</em>
                 </span>
                 <span
@@ -386,7 +388,9 @@
           >
             <div class="row-body">
               <div class="row-top">
-                <span class="desc">{{ op.empresa }}</span>
+                <span class="desc">
+                  <span class="ellipsis" [title]="op.empresa">{{ op.empresa }}</span>
+                </span>
                 <span
                   class="amount"
                   [class.gain]="op.resultadoNeto >= 0"

@@ -284,13 +284,18 @@
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
+  width: 100%;
 }
 
 .row {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   border-radius: 14px;
   background: var(--surface);
   border: 1px solid var(--line);
   backdrop-filter: blur(10px);
+  overflow: hidden;
   animation: rise 0.4s var(--ease-out) both;
   transition: border-color 0.2s, transform 0.2s var(--ease-out);
 }
@@ -305,6 +310,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .row-top {
@@ -312,16 +318,33 @@
   justify-content: space-between;
   gap: 1rem;
   align-items: baseline;
+  min-width: 0;
+  width: 100%;
 }
 
 .desc {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  flex: 1 1 0;
   font-weight: 700;
   color: var(--ink);
   font-family: var(--font-display);
   letter-spacing: -0.02em;
 }
 
+.desc .ellipsis {
+  flex: 1 1 0;
+}
+
+.desc .badge {
+  margin-left: 0;
+  flex-shrink: 0;
+}
+
 .amount {
+  flex-shrink: 0;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   color: var(--ink);

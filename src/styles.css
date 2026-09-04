@@ -173,6 +173,13 @@ textarea {
   line-height: 1.45;
 }
 
+.ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 640px) {
   .page {
     gap: 1rem;
