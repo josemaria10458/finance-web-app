@@ -69,8 +69,8 @@ export const routes: Routes = [
       {
         path: 'configuracion',
         loadComponent: () =>
-          import('./features/onboarding/onboarding.component').then(
-            (m) => m.OnboardingComponent
+          import('./features/configuracion/configuracion.component').then(
+            (m) => m.ConfiguracionComponent
           ),
       },
     ],

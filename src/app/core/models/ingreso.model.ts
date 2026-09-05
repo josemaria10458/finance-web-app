@@ -6,6 +6,8 @@ export interface Ingreso {
   importe: number;
   descripcion: string;
   categoria: CategoriaIngreso;
+  /** Si viene de una programación mensual. */
+  recurrenteId?: string;
 }
 
 export type IngresoInput = Omit<Ingreso, 'id'>;

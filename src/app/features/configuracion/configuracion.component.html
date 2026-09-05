@@ -1,0 +1,109 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Configuración</h1>
+      <p class="subtitle">
+        Añade o quita categorías de gastos e ingresos. Los cambios se guardan al momento.
+      </p>
+    </div>
+  </header>
+
+  <section class="block">
+    <h2>Categorías de gastos</h2>
+    <p class="hint">Categorías principales y subcategorías opcionales.</p>
+
+    <div class="add-row">
+      <input
+        type="text"
+        placeholder="Nueva categoría de gasto"
+        [ngModel]="nuevaCategoriaGasto()"
+        (ngModelChange)="nuevaCategoriaGasto.set($event)"
+        (keyup.enter)="addCategoriaGasto()"
+      />
+      <button type="button" class="btn-add" (click)="addCategoriaGasto()">
+        <mat-icon>add</mat-icon>
+      </button>
+    </div>
+
+    @for (g of draft().gastos; track trackGasto($index, g); let i = $index) {
+      <article class="cat-card">
+        <div class="cat-head">
+          <strong>{{ g.nombre }}</strong>
+          <button
+            type="button"
+            class="icon-btn danger"
+            aria-label="Eliminar categoría"
+            (click)="removeCategoriaGasto(i)"
+          >
+            <mat-icon>delete</mat-icon>
+          </button>
+        </div>
+
+        @if (g.subcategorias.length) {
+          <ul class="sub-list">
+            @for (sub of g.subcategorias; track sub) {
+              <li>
+                <span>{{ sub }}</span>
+                <button
+                  type="button"
+                  class="icon-btn"
+                  aria-label="Quitar subcategoría"
+                  (click)="removeSubcategoria(g.nombre, sub)"
+                >
+                  <mat-icon>close</mat-icon>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+
+        <div class="add-row sub-add">
+          <input
+            type="text"
+            placeholder="Subcategoría"
+            [ngModel]="subInput(g.nombre)"
+            (ngModelChange)="setSubInput(g.nombre, $event)"
+            (keyup.enter)="addSubcategoria(g.nombre)"
+          />
+          <button type="button" class="btn-add" (click)="addSubcategoria(g.nombre)">
+            <mat-icon>add</mat-icon>
+          </button>
+        </div>
+      </article>
+    }
+  </section>
+
+  <section class="block">
+    <h2>Categorías de ingresos</h2>
+    <p class="hint">Tipos de cobro (nómina, ventas, etc.).</p>
+
+    <div class="add-row">
+      <input
+        type="text"
+        placeholder="Nueva categoría de ingreso"
+        [ngModel]="nuevoIngreso()"
+        (ngModelChange)="nuevoIngreso.set($event)"
+        (keyup.enter)="addIngreso()"
+      />
+      <button type="button" class="btn-add" (click)="addIngreso()">
+        <mat-icon>add</mat-icon>
+      </button>
+    </div>
+
+    <ul class="ingreso-list">
+      @for (ing of draft().ingresos; track ing; let i = $index) {
+        <li>
+          <span>{{ ing }}</span>
+          <button
+            type="button"
+            class="icon-btn danger"
+            aria-label="Eliminar categoría"
+            (click)="removeIngreso(i)"
+          >
+            <mat-icon>delete</mat-icon>
+          </button>
+        </li>
+      }
+    </ul>
+  </section>
+</div>

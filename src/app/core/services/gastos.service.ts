@@ -136,6 +136,7 @@ export class GastosService {
 
   private normalize(gasto: Gasto): Gasto {
     const sub = gasto.subcategoria?.trim();
+    const recurrenteId = gasto.recurrenteId?.trim();
     return {
       id: gasto.id,
       fecha: gasto.fecha,
@@ -143,6 +144,7 @@ export class GastosService {
       descripcion: gasto.descripcion,
       categoria: gasto.categoria,
       ...(sub ? { subcategoria: sub } : {}),
+      ...(recurrenteId ? { recurrenteId } : {}),
     };
   }
 }
