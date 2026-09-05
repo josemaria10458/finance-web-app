@@ -7,6 +7,8 @@ export interface Gasto {
   descripcion: string;
   categoria: CategoriaGasto;
   subcategoria?: string;
+  /** Si viene de una programación mensual. */
+  recurrenteId?: string;
 }
 
 export type GastoInput = Omit<Gasto, 'id'>;

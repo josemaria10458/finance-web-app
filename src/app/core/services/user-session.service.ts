@@ -7,6 +7,7 @@ import { FiltroAnioService } from './filtro-anio.service';
 import { GastosService } from './gastos.service';
 import { IngresosService } from './ingresos.service';
 import { InversionesService } from './inversiones.service';
+import { RecurrentesService } from './recurrentes.service';
 import {
   UserDataSnapshot,
   UserFirestoreService,
@@ -22,6 +23,7 @@ export class UserSessionService {
   private readonly gastos = inject(GastosService);
   private readonly ingresos = inject(IngresosService);
   private readonly inversiones = inject(InversionesService);
+  private readonly recurrentes = inject(RecurrentesService);
 
   private lastUid: string | null = null;
   private loadPromise: Promise<void> | null = null;
@@ -87,6 +89,7 @@ export class UserSessionService {
     this.gastos.clearUser();
     this.ingresos.clearUser();
     this.inversiones.clearUser();
+    this.recurrentes.clearUser();
     this.categorias.clearUser();
     this.filtroAnio.clearUser();
   }
@@ -96,6 +99,7 @@ export class UserSessionService {
     this.gastos.setUid(uid);
     this.ingresos.setUid(uid);
     this.inversiones.setUid(uid);
+    this.recurrentes.setUid(uid);
     this.categorias.setUid(uid);
     this.filtroAnio.setUid(uid);
 
@@ -108,8 +112,10 @@ export class UserSessionService {
         this.gastos.hydrate(dataWithSetup.gastos);
         this.ingresos.hydrate(dataWithSetup.ingresos);
         this.inversiones.hydrate(dataWithSetup.operaciones);
+        this.recurrentes.hydrate(dataWithSetup.recurrentes ?? []);
         this.categorias.hydrate(dataWithSetup.categoriasConfig);
         this.filtroAnio.hydrate(dataWithSetup.filtroAnio);
+        this.recurrentes.generatePending();
 
         if (
           this.snapshotHasUserData(dataWithSetup) &&
@@ -131,6 +137,7 @@ export class UserSessionService {
         this.gastos.setUid(uid);
         this.ingresos.setUid(uid);
         this.inversiones.setUid(uid);
+        this.recurrentes.setUid(uid);
         this.categorias.setUid(uid);
         this.filtroAnio.setUid(uid);
       })

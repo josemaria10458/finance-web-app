@@ -18,6 +18,7 @@ import {
   yearMonthKey,
 } from '../../core/utils/date.utils';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { RecurringDialogComponent } from '../../shared/components/recurring-dialog/recurring-dialog.component';
 import {
   GastoFormDialogComponent,
   GastoFormDialogData,
@@ -209,6 +210,29 @@ export class GastosComponent {
 
   abrirNuevo(): void {
     this.openForm();
+  }
+
+  abrirProgramar(): void {
+    const ref = this.dialog.open(RecurringDialogComponent, {
+      width: '480px',
+      maxWidth: '94vw',
+      panelClass: 'app-dialog',
+      data: { tipo: 'gasto' },
+    });
+    ref.afterClosed().subscribe((rule) => {
+      if (!rule?.id) return;
+      const visible = this.gastosService
+        .gastos()
+        .find((g) => g.recurrenteId === rule.id);
+      if (visible) this.revelarGasto(visible);
+      this.snackBar.open(
+        visible
+          ? 'Gasto programado y añadido este mes'
+          : `Gasto programado: se añadirá el día ${rule.diaDelMes} de cada mes`,
+        'Cerrar',
+        { duration: 2800 }
+      );
+    });
   }
 
   abrirEditar(gasto: Gasto): void {

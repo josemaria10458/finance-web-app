@@ -15,8 +15,10 @@ import { IngresosService } from '../../core/services/ingresos.service';
 import {
   formatMesLabel,
   buildMonthOptions,
+  yearMonthKey,
 } from '../../core/utils/date.utils';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { RecurringDialogComponent } from '../../shared/components/recurring-dialog/recurring-dialog.component';
 import {
   IngresoFormDialogComponent,
   IngresoFormDialogData,
@@ -162,6 +164,29 @@ export class IngresosComponent {
     this.openForm();
   }
 
+  abrirProgramar(): void {
+    const ref = this.dialog.open(RecurringDialogComponent, {
+      width: '480px',
+      maxWidth: '94vw',
+      panelClass: 'app-dialog',
+      data: { tipo: 'ingreso' },
+    });
+    ref.afterClosed().subscribe((rule) => {
+      if (!rule?.id) return;
+      const visible = this.ingresosService
+        .ingresos()
+        .find((i) => i.recurrenteId === rule.id);
+      if (visible) this.revelarIngreso(visible);
+      this.snackBar.open(
+        visible
+          ? 'Ingreso programado y añadido este mes'
+          : `Ingreso programado: se añadirá el día ${rule.diaDelMes} de cada mes`,
+        'Cerrar',
+        { duration: 2800 }
+      );
+    });
+  }
+
   abrirEditar(ingreso: Ingreso): void {
     this.openForm(ingreso);
   }
@@ -193,6 +218,9 @@ export class IngresosComponent {
     });
     ref.afterClosed().subscribe((saved) => {
       if (saved) {
+        const id = ingreso?.id ?? this.ingresosService.ingresos()[0]?.id;
+        const visible = this.ingresosService.ingresos().find((i) => i.id === id);
+        if (visible) this.revelarIngreso(visible);
         this.snackBar.open(
           ingreso ? 'Ingreso actualizado' : 'Ingreso añadido',
           'Cerrar',
@@ -200,5 +228,16 @@ export class IngresosComponent {
         );
       }
     });
+  }
+
+  private revelarIngreso(ingreso: Ingreso): void {
+    if (!this.filtroAnio.matchesDate(ingreso.fecha)) {
+      const year = Number(ingreso.fecha.slice(0, 4));
+      if (Number.isFinite(year)) this.filtroAnio.setYear(year);
+    }
+    const mes = this.mesFiltro();
+    if (mes && yearMonthKey(ingreso.fecha) !== mes) {
+      this.mesFiltro.set(yearMonthKey(ingreso.fecha));
+    }
   }
 }

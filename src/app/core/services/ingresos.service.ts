@@ -25,7 +25,7 @@ export class IngresosService {
   }
 
   hydrate(ingresos: Ingreso[]): void {
-    this._ingresos.set(ingresos);
+    this._ingresos.set(ingresos.map((i) => this.normalize(i)));
   }
 
   list(): Ingreso[] {
@@ -49,7 +49,7 @@ export class IngresosService {
   }
 
   add(input: IngresoInput): Ingreso {
-    const ingreso: Ingreso = { ...input, id: crypto.randomUUID() };
+    const ingreso = this.normalize({ ...input, id: crypto.randomUUID() });
     this.persist([ingreso, ...this._ingresos()]);
     return ingreso;
   }
@@ -60,7 +60,7 @@ export class IngresosService {
     if (idx < 0) {
       return null;
     }
-    const updated: Ingreso = { ...input, id };
+    const updated = this.normalize({ ...input, id });
     const next = [...current];
     next[idx] = updated;
     this.persist(next);
@@ -72,10 +72,12 @@ export class IngresosService {
   }
 
   importMany(items: IngresoInput[], replace = false): number {
-    const nuevos = items.map((input) => ({
-      ...input,
-      id: crypto.randomUUID(),
-    }));
+    const nuevos = items.map((input) =>
+      this.normalize({
+        ...input,
+        id: crypto.randomUUID(),
+      })
+    );
     this.persist(replace ? nuevos : [...nuevos, ...this._ingresos()]);
     return nuevos.length;
   }
@@ -86,9 +88,22 @@ export class IngresosService {
   }
 
   private persist(ingresos: Ingreso[]): void {
-    this._ingresos.set(ingresos);
+    const clean = ingresos.map((i) => this.normalize(i));
+    this._ingresos.set(clean);
     if (this.uid) {
-      void this.firestore.patch(this.uid, { ingresos });
+      void this.firestore.patch(this.uid, { ingresos: clean });
     }
+  }
+
+  private normalize(ingreso: Ingreso): Ingreso {
+    const recurrenteId = ingreso.recurrenteId?.trim();
+    return {
+      id: ingreso.id,
+      fecha: ingreso.fecha,
+      importe: ingreso.importe,
+      descripcion: ingreso.descripcion,
+      categoria: ingreso.categoria,
+      ...(recurrenteId ? { recurrenteId } : {}),
+    };
   }
 }

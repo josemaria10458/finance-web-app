@@ -4,10 +4,16 @@
       <h1>Gastos</h1>
       <p class="subtitle">Resumen del mes por categoría e histórico detallado.</p>
     </div>
-    <button class="btn-primary" type="button" (click)="abrirNuevo()">
-      <mat-icon>add</mat-icon>
-      Nuevo gasto
-    </button>
+    <div class="header-actions">
+      <button class="btn-secondary" type="button" (click)="abrirProgramar()">
+        <mat-icon>event</mat-icon>
+        Programar
+      </button>
+      <button class="btn-primary" type="button" (click)="abrirNuevo()">
+        <mat-icon>add</mat-icon>
+        Nuevo gasto
+      </button>
+    </div>
   </header>
 
   <div class="filters">

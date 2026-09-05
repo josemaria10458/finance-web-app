@@ -6,6 +6,7 @@ import {
 import { Gasto } from '../models/gasto.model';
 import { Ingreso } from '../models/ingreso.model';
 import { OperacionBolsa } from '../models/operacion-bolsa.model';
+import { MovimientoRecurrente } from '../models/recurrente.model';
 import {
   doc,
   getDoc,
@@ -29,6 +30,7 @@ export interface UserDataSnapshot {
   gastos: Gasto[];
   ingresos: Ingreso[];
   operaciones: OperacionBolsa[];
+  recurrentes: MovimientoRecurrente[];
   categoriasConfig: CategoriasConfig;
   filtroAnio: number | null;
   initialSetupCompleted: boolean;
@@ -69,6 +71,7 @@ export class UserFirestoreService {
         gastos: [],
         ingresos: [],
         operaciones: [],
+        recurrentes: [],
         categoriasConfig: empty.categoriasConfig,
         filtroAnio: null,
         initialSetupCompleted: false,
@@ -97,6 +100,7 @@ export class UserFirestoreService {
       gastos: [],
       ingresos: [],
       operaciones: [],
+      recurrentes: [],
       categoriasConfig: structuredClone(DEFAULT_CATEGORIAS_CONFIG),
       filtroAnio: null,
       initialSetupCompleted: false,
@@ -157,6 +161,7 @@ export class UserFirestoreService {
       gastos,
       ingresos,
       operaciones,
+      recurrentes: [],
       categoriasConfig,
       filtroAnio,
       initialSetupCompleted,
@@ -195,6 +200,9 @@ export class UserFirestoreService {
     const operaciones = Array.isArray(raw['operaciones'])
       ? (raw['operaciones'] as OperacionBolsa[])
       : defaults.operaciones;
+    const recurrentes = Array.isArray(raw['recurrentes'])
+      ? (raw['recurrentes'] as MovimientoRecurrente[])
+      : defaults.recurrentes;
 
     const hasLegacyActivity =
       gastos.length > 0 || ingresos.length > 0 || operaciones.length > 0;
@@ -222,6 +230,7 @@ export class UserFirestoreService {
       gastos,
       ingresos,
       operaciones,
+      recurrentes,
       categoriasConfig,
       filtroAnio:
         typeof raw['filtroAnio'] === 'number' &&

@@ -40,6 +40,14 @@ export function todayIso(): string {
   return toIsoDate(new Date());
 }
 
+/** Fecha YYYY-MM-DD para un día del mes, limitada al último día real. */
+export function dateForDayInMonth(yearMonth: string, day: number): string {
+  const [y, m] = yearMonth.split('-').map(Number);
+  const last = new Date(y, m, 0).getDate();
+  const d = Math.min(Math.max(1, Math.round(day)), last);
+  return toIsoDate(new Date(y, m - 1, d));
+}
+
 /**
  * Fecha por defecto al crear un movimiento para que coincida con el filtro
  * de año/mes activo y no “desaparezca” al guardar.
