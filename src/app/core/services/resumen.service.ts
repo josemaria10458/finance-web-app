@@ -10,6 +10,7 @@ import { FiltroAnioService } from './filtro-anio.service';
 import { GastosService } from './gastos.service';
 import { IngresosService } from './ingresos.service';
 import { InversionesService } from './inversiones.service';
+import { esVentaEnMes } from '../utils/inversion-mensual.utils';
 
 export type { RangoResumen };
 
@@ -143,13 +144,9 @@ export class ResumenService {
         .reduce((s, g) => s + g.importe, 0);
 
       const comprasMes = ops.filter(
-        (o) => yearMonthKey(o.fechaOperacion) === ym
+        (o) => !o.esVenta && yearMonthKey(o.fechaOperacion) === ym
       );
-      const ventasMes = ops.filter((o) => {
-        if (o.precioVentaAccion == null) return false;
-        const ventaKey = yearMonthKey(o.fechaVenta ?? o.fechaOperacion);
-        return ventaKey === ym;
-      });
+      const ventasMes = ops.filter((o) => esVentaEnMes(o, ym));
 
       const dineroInvertidoMes = comprasMes.reduce(
         (s, o) => s + costeOperacion(o),

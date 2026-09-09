@@ -19,6 +19,7 @@
 }
 
 .btn-primary mat-icon,
+.btn-secondary mat-icon,
 .btn-danger-outline mat-icon {
   font-size: 18px;
   width: 18px;
@@ -29,6 +30,25 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.7rem 1.05rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+
+.btn-secondary:hover {
+  border-color: rgba(31, 111, 102, 0.35);
 }
 
 .btn-danger-outline {
@@ -88,7 +108,7 @@
 
 .kpis {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr;
+  grid-template-columns: 1.3fr 1fr 1fr 1fr;
   gap: 0.75rem;
 }
 
@@ -401,6 +421,12 @@
   border-color: rgba(181, 74, 58, 0.25);
 }
 
+@media (max-width: 1100px) {
+  .kpis {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 @media (max-width: 800px) {
   .kpis {
     grid-template-columns: 1fr;
@@ -575,6 +601,7 @@ tbody tr:last-child td {
   }
 
   .page-header .btn-primary,
+  .page-header .btn-secondary,
   .page-header .btn-danger-outline {
     width: 100%;
     justify-content: center;

@@ -32,6 +32,14 @@ export function buildXirrCashFlows(
   let capitalAbierto = 0;
 
   for (const o of ops) {
+    if (o.consolidadaEnId) {
+      const coste = costeOperacion(o);
+      if (coste !== 0) {
+        flows.push({ amount: -coste, dateIso: o.fechaOperacion });
+      }
+      continue;
+    }
+
     if (o.esVenta) {
       const ingreso = ingresoVenta(o);
       if (ingreso !== 0) {
@@ -97,7 +105,7 @@ export class InversionesService {
 
   readonly abiertas = computed(() =>
     this._operaciones().filter(
-      (o) => !o.esVenta && o.precioVentaAccion == null
+      (o) => !o.esVenta && o.precioVentaAccion == null && !o.consolidadaEnId
     )
   );
 
@@ -119,7 +127,9 @@ export class InversionesService {
   );
 
   readonly resultadoNetoVentas = computed(() =>
-    this.ventas().reduce((sum, o) => sum + o.resultadoNeto, 0)
+    this._operaciones()
+      .filter((o) => !o.consolidadaEnId && (o.esVenta === true || o.precioVentaAccion != null))
+      .reduce((sum, o) => sum + o.resultadoNeto, 0)
   );
 
   /**
@@ -208,7 +218,7 @@ export class InversionesService {
       return null;
     }
     const prev = current[idx];
-    if (prev.precioVentaAccion != null) {
+    if (prev.precioVentaAccion != null || prev.consolidadaEnId) {
       return null;
     }
     const updated: OperacionBolsa = {
@@ -223,38 +233,165 @@ export class InversionesService {
     return updated;
   }
 
+  /** Venta sin una compra abierta previa (compra + cierre en el mismo registro). */
+  addVentaCerrada(input: {
+    empresa: string;
+    fechaOperacion: string;
+    fechaVenta: string;
+    inversion: number;
+    comision: number;
+    precioCompraAccion: number;
+    numeroAcciones: number;
+    precioVentaAccion: number;
+    provisionImpuestos?: number;
+  }): OperacionBolsa {
+    const comision = Math.abs(input.comision) || 0;
+    const shares = Math.abs(input.numeroAcciones);
+    const inversion = Math.abs(input.inversion);
+    const provision = Math.abs(input.provisionImpuestos ?? 0);
+    const coste = costeOperacion({ inversion, comision });
+    const resultadoNeto =
+      input.precioVentaAccion * shares - coste - provision;
+    const rentabilidadPct = coste > 0 ? (resultadoNeto / coste) * 100 : 0;
+    const op: OperacionBolsa = {
+      id: crypto.randomUUID(),
+      empresa: input.empresa,
+      fechaOperacion: input.fechaOperacion,
+      inversion,
+      comision,
+      precioCompraAccion: input.precioCompraAccion,
+      numeroAcciones: shares,
+      precioVentaAccion: input.precioVentaAccion,
+      fechaVenta: input.fechaVenta,
+      provisionImpuestos: provision || undefined,
+      resultadoNeto,
+      rentabilidadPct,
+      esVenta: false,
+    };
+    this.persist([op, ...this._operaciones()]);
+    return op;
+  }
+
   registrarVenta(
     id: string,
     precioVentaAccion: number,
     provisionImpuestos = 0,
     fechaVenta = todayIso()
   ): OperacionBolsa | null {
+    const n = this.registrarVentas(
+      [id],
+      precioVentaAccion,
+      provisionImpuestos,
+      fechaVenta
+    );
+    if (!n) return null;
+    return this._operaciones().find((o) => o.id === id) ?? null;
+  }
+
+  /** Cierra varias posiciones abiertas con el mismo precio y fecha. */
+  registrarVentas(
+    ids: string[],
+    precioVentaAccion: number,
+    provisionImpuestos = 0,
+    fechaVenta = todayIso()
+  ): number {
+    const wanted = new Set(ids.filter(Boolean));
+    if (!wanted.size) return 0;
+
     const current = this._operaciones();
-    const idx = current.findIndex((o) => o.id === id);
-    if (idx < 0) {
-      return null;
+    const targets = current.filter(
+      (o) => wanted.has(o.id) && !o.esVenta && o.precioVentaAccion == null && !o.consolidadaEnId
+    );
+    if (!targets.length) return 0;
+
+    if (targets.length > 1) {
+      return this.consolidarEnUnaVenta(
+        current,
+        targets,
+        precioVentaAccion,
+        provisionImpuestos,
+        fechaVenta
+      );
     }
-    const op = current[idx];
+
+    const op = targets[0];
     const coste = costeOperacion(op);
-    const ingresoBruto = precioVentaAccion * op.numeroAcciones;
-    const resultadoNeto = ingresoBruto - coste - provisionImpuestos;
+    const resultadoNeto =
+      precioVentaAccion * op.numeroAcciones - coste - provisionImpuestos;
     const rentabilidadPct = coste > 0 ? (resultadoNeto / coste) * 100 : 0;
-    const updated: OperacionBolsa = {
-      ...op,
+    const next = current.map((o) =>
+      o.id === op.id
+        ? {
+            ...o,
+            precioVentaAccion,
+            fechaVenta,
+            ...(provisionImpuestos ? { provisionImpuestos } : {}),
+            resultadoNeto,
+            rentabilidadPct,
+          }
+        : o
+    );
+    this.persist(next);
+    return 1;
+  }
+
+  private consolidarEnUnaVenta(
+    current: OperacionBolsa[],
+    targets: OperacionBolsa[],
+    precioVentaAccion: number,
+    provisionImpuestos: number,
+    fechaVenta: string
+  ): number {
+    const shares = targets.reduce((s, o) => s + o.numeroAcciones, 0);
+    const inversion = targets.reduce((s, o) => s + o.inversion, 0);
+    const comision = targets.reduce((s, o) => s + o.comision, 0);
+    const coste = targets.reduce((s, o) => s + costeOperacion(o), 0);
+    const precioCompraAccion =
+      shares > 0
+        ? targets.reduce((s, o) => s + o.precioCompraAccion * o.numeroAcciones, 0) /
+          shares
+        : 0;
+    const empresas = [
+      ...new Set(targets.map((o) => o.empresa.trim()).filter(Boolean)),
+    ];
+    const resultadoNeto =
+      precioVentaAccion * shares - coste - provisionImpuestos;
+    const rentabilidadPct = coste > 0 ? (resultadoNeto / coste) * 100 : 0;
+    const ventaId = crypto.randomUUID();
+    const origenIds = targets.map((o) => o.id);
+    const venta: OperacionBolsa = {
+      id: ventaId,
+      empresa: (empresas.join(', ') || 'Varias').slice(0, 80),
+      fechaOperacion: fechaVenta,
+      inversion,
+      comision,
+      precioCompraAccion,
+      numeroAcciones: shares,
       precioVentaAccion,
       fechaVenta,
-      provisionImpuestos,
+      ...(provisionImpuestos ? { provisionImpuestos } : {}),
       resultadoNeto,
       rentabilidadPct,
+      esVenta: true,
+      origenIds,
     };
-    const next = [...current];
-    next[idx] = updated;
-    this.persist(next);
-    return updated;
+    const origen = new Set(origenIds);
+    const next = current.map((o) =>
+      origen.has(o.id) ? { ...o, consolidadaEnId: ventaId } : o
+    );
+    this.persist([venta, ...next]);
+    return 1;
   }
 
   remove(id: string): void {
-    this.persist(this._operaciones().filter((o) => o.id !== id));
+    const next = this._operaciones()
+      .filter((o) => o.id !== id)
+      .map((o) => {
+        if (o.consolidadaEnId !== id) return o;
+        const { consolidadaEnId: _omit, ...rest } = o;
+        return rest;
+      });
+    this.persist(next);
   }
 
   clearAll(): void {

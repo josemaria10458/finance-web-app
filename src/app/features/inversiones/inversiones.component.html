@@ -16,6 +16,10 @@
         <mat-icon>delete_sweep</mat-icon>
         Borrar todas
       </button>
+      <button class="btn-secondary" type="button" (click)="abrirVenta()">
+        <mat-icon>trending_down</mat-icon>
+        Nueva venta
+      </button>
       <button class="btn-primary" type="button" (click)="abrirCompra()">
         <mat-icon>add</mat-icon>
         Nueva compra
@@ -50,6 +54,21 @@
         } @else {
           —
         }
+      </strong>
+    </div>
+    <div class="kpi">
+      <span
+        class="kpi-label"
+        [title]="
+          'Estimación IRPF base del ahorro ' +
+          impuestosAnio() +
+          ' (19–30 %) sobre plusvalías realizadas en el año'
+        "
+      >
+        Impuestos {{ impuestosAnio() }}
+      </span>
+      <strong>
+        {{ impuestosAPagar() | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
       </strong>
     </div>
   </section>
@@ -275,6 +294,17 @@
                     </span>
                   }
                 </div>
+                @if (mov.tipo === 'compra' && puedeVender(mov.operacion)) {
+                  <div class="row-actions">
+                    <button
+                      type="button"
+                      class="btn-ghost"
+                      (click)="abrirVenta(mov.operacion)"
+                    >
+                      Vender
+                    </button>
+                  </div>
+                }
               </div>
             </li>
           }
@@ -298,14 +328,22 @@
               <div class="row-top">
                 <span class="desc">
                   <span class="ellipsis" [title]="op.empresa">{{ op.empresa }}</span>
-                  <em class="badge" [class.venta]="op.esVenta">{{ op.esVenta ? 'Venta' : 'Compra' }}</em>
+                  <em class="badge" [class.venta]="op.esVenta || op.precioVentaAccion != null">{{
+                    op.esVenta || op.precioVentaAccion != null ? 'Venta' : 'Compra'
+                  }}</em>
                 </span>
                 <span
                   class="amount"
-                  [class.gain]="op.esVenta && op.resultadoNeto >= 0"
-                  [class.loss]="op.esVenta && op.resultadoNeto < 0"
+                  [class.gain]="
+                    (op.esVenta || op.precioVentaAccion != null) &&
+                    op.resultadoNeto >= 0
+                  "
+                  [class.loss]="
+                    (op.esVenta || op.precioVentaAccion != null) &&
+                    op.resultadoNeto < 0
+                  "
                 >
-                  @if (op.esVenta) {
+                  @if (op.esVenta || op.precioVentaAccion != null) {
                     {{ op.resultadoNeto | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
                   } @else {
                     {{ coste(op) | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
@@ -316,7 +354,7 @@
                 <span>{{ fechaRef(op) | date: 'dd/MM/yyyy' }}</span>
                 <span class="sep">·</span>
                 <span>{{ op.numeroAcciones | number: '1.0-4' }} acc.</span>
-                @if (op.esVenta) {
+                @if (op.esVenta || op.precioVentaAccion != null) {
                   <span class="sep">·</span>
                   <span
                     class="rent"
@@ -351,7 +389,10 @@
                 }
               </div>
               <div class="row-actions">
-                @if (!op.esVenta && op.precioVentaAccion == null) {
+                @if (puedeVender(op)) {
+                  <button type="button" class="btn-ghost" (click)="abrirVenta(op)">
+                    Vender
+                  </button>
                   <button type="button" class="btn-ghost" (click)="abrirCompra(op)">
                     Editar
                   </button>
@@ -374,8 +415,11 @@
       <div class="empty">
         <p class="empty-title">Sin ventas</p>
         <p class="empty-copy">
-          Aquí aparecen las filas del Excel con Inversión negativa.
+          Vende una posición abierta o registra una venta si no tienes la compra en la app.
         </p>
+        <button class="btn-primary" type="button" (click)="abrirVenta()">
+          Nueva venta
+        </button>
       </div>
     } @else {
       <ul class="list">
