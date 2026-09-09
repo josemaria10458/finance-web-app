@@ -13,6 +13,10 @@ export interface OperacionBolsa {
   provisionImpuestos?: number;
   /** true si en el Excel la columna Inversión era negativa (venta). */
   esVenta?: boolean;
+  /** Lotes de compra absorbidos por una venta unificada. */
+  origenIds?: string[];
+  /** Esta compra se vendió dentro de la venta con este id. */
+  consolidadaEnId?: string;
 }
 
 export type OperacionBolsaInput = Omit<

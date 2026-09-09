@@ -9,8 +9,10 @@ import { OperacionBolsa, costeOperacion } from '../../core/models';
 import { FiltroAnioService } from '../../core/services/filtro-anio.service';
 import { InversionesService } from '../../core/services/inversiones.service';
 import { buildMonthOptions, formatMesLabel } from '../../core/utils/date.utils';
+import { impuestosAPagarDelAnio } from '../../core/utils/irpf-ahorro.utils';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { CompraFormDialogComponent } from './compra-form-dialog.component';
+import { VentaFormDialogComponent } from './venta-form-dialog.component';
 
 type Vista = 'historico' | 'ventas' | 'meses';
 type OrdenCampo = 'fecha' | 'importe';
@@ -47,6 +49,13 @@ export class InversionesComponent {
   readonly capitalAbierto = this.inversionesService.capitalInvertidoAbierto;
   readonly resultadoVentas = this.inversionesService.resultadoNetoVentas;
   readonly rentabilidadAnual = this.inversionesService.rentabilidadAnual;
+  readonly impuestosAnio = computed(() => this.filtroAnio.referenceYear());
+  readonly impuestosAPagar = computed(() =>
+    impuestosAPagarDelAnio(
+      this.inversionesService.operaciones(),
+      this.impuestosAnio()
+    )
+  );
 
   readonly totalOps = computed(() => {
     this.filtroAnio.year();
@@ -78,12 +87,16 @@ export class InversionesComponent {
     return this.inversionesService.movimientosMes(this.mesFiltro());
   });
 
-  readonly historico = computed(() => this.sortOps([...this.opsDelAnio()]));
+  readonly historico = computed(() =>
+    this.sortOps(this.opsDelAnio().filter((o) => !o.consolidadaEnId))
+  );
 
   readonly ventas = computed(() =>
     this.sortOps(
       this.opsDelAnio().filter(
-        (o) => o.esVenta === true || o.precioVentaAccion != null
+        (o) =>
+          !o.consolidadaEnId &&
+          (o.esVenta === true || o.precioVentaAccion != null)
       )
     )
   );
@@ -166,6 +179,30 @@ export class InversionesComponent {
         );
       }
     });
+  }
+
+  abrirVenta(op?: OperacionBolsa): void {
+    if (op && (op.esVenta || op.precioVentaAccion != null || op.consolidadaEnId)) {
+      this.snackBar.open('Esta posición ya está cerrada', 'Cerrar', {
+        duration: 2500,
+      });
+      return;
+    }
+    const ref = this.dialog.open(VentaFormDialogComponent, {
+      width: '520px',
+      maxWidth: '94vw',
+      panelClass: 'app-dialog',
+      data: op ? { operacion: op } : {},
+    });
+    ref.afterClosed().subscribe((saved) => {
+      if (!saved) return;
+      this.vista.set('ventas');
+      this.snackBar.open('Venta registrada', 'Cerrar', { duration: 2500 });
+    });
+  }
+
+  puedeVender(op: OperacionBolsa): boolean {
+    return !op.esVenta && op.precioVentaAccion == null && !op.consolidadaEnId;
   }
 
   confirmarBorrar(op: OperacionBolsa): void {

@@ -16,6 +16,7 @@ export function esCompraEnMes(op: OperacionBolsa, ym: string): boolean {
 }
 
 export function esVentaEnMes(op: OperacionBolsa, ym: string): boolean {
+  if (op.consolidadaEnId) return false;
   if (op.esVenta) {
     return yearMonthKey(op.fechaVenta ?? op.fechaOperacion) === ym;
   }
@@ -32,7 +33,9 @@ export function mesesConActividad(ops: OperacionBolsa[]): string[] {
       keys.add(yearMonthKey(o.fechaOperacion));
     }
     if (o.esVenta || o.precioVentaAccion != null) {
-      keys.add(yearMonthKey(o.fechaVenta ?? o.fechaOperacion));
+      if (!o.consolidadaEnId) {
+        keys.add(yearMonthKey(o.fechaVenta ?? o.fechaOperacion));
+      }
     }
   }
   return [...keys].sort().reverse();

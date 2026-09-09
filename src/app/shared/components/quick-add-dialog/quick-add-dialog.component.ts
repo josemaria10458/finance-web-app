@@ -9,6 +9,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { GastoFormDialogComponent } from '../../../features/gastos/gasto-form-dialog.component';
 import { IngresoFormDialogComponent } from '../../../features/ingresos/ingreso-form-dialog.component';
 import { CompraFormDialogComponent } from '../../../features/inversiones/compra-form-dialog.component';
+import { VentaFormDialogComponent } from '../../../features/inversiones/venta-form-dialog.component';
 
 @Component({
   selector: 'app-quick-add-dialog',
@@ -35,8 +36,15 @@ import { CompraFormDialogComponent } from '../../../features/inversiones/compra-
         <button type="button" class="choice" (click)="abrirInversion()">
           <mat-icon>show_chart</mat-icon>
           <span class="choice-copy">
-            <strong>Inversión</strong>
-            <small>Compra de acciones / ETF</small>
+            <strong>Compra</strong>
+            <small>Acciones / ETF</small>
+          </span>
+        </button>
+        <button type="button" class="choice" (click)="abrirVenta()">
+          <mat-icon>trending_down</mat-icon>
+          <span class="choice-copy">
+            <strong>Venta</strong>
+            <small>Cerrar una posición o registrar una venta</small>
           </span>
         </button>
       </div>
@@ -120,6 +128,16 @@ export class QuickAddDialogComponent {
     this.dialogRef.close();
     this.dialog.open(CompraFormDialogComponent, {
       width: '480px',
+      maxWidth: '94vw',
+      panelClass: 'app-dialog',
+      data: {},
+    });
+  }
+
+  abrirVenta(): void {
+    this.dialogRef.close();
+    this.dialog.open(VentaFormDialogComponent, {
+      width: '520px',
       maxWidth: '94vw',
       panelClass: 'app-dialog',
       data: {},
