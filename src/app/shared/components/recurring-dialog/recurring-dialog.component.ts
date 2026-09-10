@@ -52,7 +52,7 @@ export interface RecurringDialogData {
                 <strong>{{ r.descripcion }}</strong>
                 <span>
                   Día {{ r.diaDelMes }} ·
-                  {{ r.importe | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+                  {{ r.importe | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}
                   · {{ r.categoria }}
                 </span>
               </div>
@@ -88,7 +88,7 @@ export interface RecurringDialogData {
         </label>
 
         <label class="field">
-          <span>Importe (€)</span>
+          <span>Importe ({{ divisaSymbol() }})</span>
           <input
             type="number"
             step="0.01"
@@ -256,6 +256,8 @@ export class RecurringDialogComponent {
 
   readonly dias = Array.from({ length: 31 }, (_, i) => i + 1);
   readonly reglas = computed(() => this.recurrentes.byTipo(this.data.tipo));
+  readonly divisa = this.categoriasConfig.divisa;
+  readonly divisaSymbol = this.categoriasConfig.divisaSymbol;
 
   readonly categorias = computed(() =>
     this.data.tipo === 'gasto'

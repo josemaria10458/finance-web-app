@@ -2,7 +2,10 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import {
   CategoriasConfig,
   DEFAULT_CATEGORIAS_CONFIG,
+  DEFAULT_DIVISA,
   GastoCategoriaConfig,
+  isDivisaCode,
+  symbolForDivisa,
 } from '../models/categorias-config.model';
 import { UserFirestoreService } from './user-firestore.service';
 
@@ -20,6 +23,11 @@ export class CategoriasConfigService {
   readonly onboardingCompleted = computed(
     () => this._config().onboardingCompleted
   );
+
+  /** Código ISO 4217 (p. ej. EUR, USD) para CurrencyPipe y formateo. */
+  readonly divisa = computed(() => this._config().divisa);
+
+  readonly divisaSymbol = computed(() => symbolForDivisa(this.divisa()));
 
   readonly categoriasGasto = computed(() =>
     this._config().gastos.map((g) => g.nombre)
@@ -113,6 +121,7 @@ export class CategoriasConfigService {
       ingresos: ingresos.length
         ? ingresos
         : structuredClone(DEFAULT_CATEGORIAS_CONFIG.ingresos),
+      divisa: isDivisaCode(config.divisa) ? config.divisa : DEFAULT_DIVISA,
       onboardingCompleted: config.onboardingCompleted === true,
     };
   }

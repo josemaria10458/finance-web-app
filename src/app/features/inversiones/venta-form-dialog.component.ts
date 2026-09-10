@@ -12,6 +12,7 @@ import {
   MatDialogRef,
 } from '@angular/material/dialog';
 import { OperacionBolsa, costeOperacion } from '../../core/models';
+import { CategoriasConfigService } from '../../core/services/categorias-config.service';
 import { InversionesService } from '../../core/services/inversiones.service';
 import { todayIso } from '../../core/utils/date.utils';
 
@@ -81,7 +82,7 @@ function normalizaTexto(value: string): string {
                     <small>
                       {{ op.numeroAcciones | number: '1.0-4' }} acc. ·
                       {{ op.fechaOperacion | date: 'dd/MM/yyyy' }} ·
-                      {{ costeDe(op) | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+                      {{ costeDe(op) | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}
                     </small>
                   </span>
                 </label>
@@ -111,7 +112,7 @@ function normalizaTexto(value: string): string {
             coste
             {{
               costeDe(seleccionadas()[0])
-                | currency: 'EUR' : 'symbol' : '1.2-2' : 'es'
+                | currency: divisa() : 'symbol' : '1.2-2' : 'es'
             }}
           </p>
         }
@@ -121,7 +122,7 @@ function normalizaTexto(value: string): string {
             <strong>1 venta unificada</strong>
             · {{ seleccionadas().length }} posiciones ·
             {{ totalAcciones() | number: '1.0-4' }} acciones · total
-            {{ totalVenta() | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+            {{ totalVenta() | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}
           </p>
           @if (empresasDistintas()) {
             <p class="warn">
@@ -150,7 +151,7 @@ function normalizaTexto(value: string): string {
 
           <div class="grid-2">
             <label class="field">
-              <span>Inversión (€)</span>
+              <span>Inversión ({{ divisaSymbol() }})</span>
               <input
                 type="number"
                 step="0.01"
@@ -160,7 +161,7 @@ function normalizaTexto(value: string): string {
               />
             </label>
             <label class="field">
-              <span>Comisión (€)</span>
+              <span>Comisión ({{ divisaSymbol() }})</span>
               <input
                 type="number"
                 step="0.01"
@@ -173,7 +174,7 @@ function normalizaTexto(value: string): string {
 
           <div class="grid-2">
             <label class="field">
-              <span>Precio compra / acción (€)</span>
+              <span>Precio compra / acción ({{ divisaSymbol() }})</span>
               <input
                 type="number"
                 step="0.0001"
@@ -201,7 +202,7 @@ function normalizaTexto(value: string): string {
         }
 
         <label class="field">
-          <span>Precio venta / acción (€)</span>
+          <span>Precio venta / acción ({{ divisaSymbol() }})</span>
           <input
             type="number"
             step="0.0001"
@@ -212,7 +213,7 @@ function normalizaTexto(value: string): string {
         </label>
 
         <label class="field">
-          <span>Provisión impuestos (€)</span>
+          <span>Provisión impuestos ({{ divisaSymbol() }})</span>
           <input
             type="number"
             step="0.01"
@@ -230,7 +231,7 @@ function normalizaTexto(value: string): string {
           >
             <div>
               <span>Resultado neto</span>
-              <strong>{{ p.resultadoNeto | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</strong>
+              <strong>{{ p.resultadoNeto | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}</strong>
             </div>
             <div>
               <span>Rentabilidad</span>
@@ -239,7 +240,7 @@ function normalizaTexto(value: string): string {
             @if (seleccionadas().length > 1) {
               <div class="preview-total">
                 <span>Total venta</span>
-                <strong>{{ totalVenta() | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</strong>
+                <strong>{{ totalVenta() | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}</strong>
               </div>
             }
           </div>
@@ -452,6 +453,10 @@ export class VentaFormDialogComponent {
   private readonly dialogRef = inject(MatDialogRef<VentaFormDialogComponent>);
   private readonly fb = inject(FormBuilder);
   private readonly inversionesService = inject(InversionesService);
+  private readonly categoriasConfig = inject(CategoriasConfigService);
+
+  readonly divisa = this.categoriasConfig.divisa;
+  readonly divisaSymbol = this.categoriasConfig.divisaSymbol;
 
   readonly posicionNueva = POSICION_NUEVA;
   readonly fija = Boolean(this.data.operacion);

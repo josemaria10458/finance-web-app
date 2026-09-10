@@ -11,6 +11,7 @@ import {
   MatDialogRef,
 } from '@angular/material/dialog';
 import { OperacionBolsa } from '../../core/models';
+import { CategoriasConfigService } from '../../core/services/categorias-config.service';
 import { InversionesService } from '../../core/services/inversiones.service';
 import { todayIso } from '../../core/utils/date.utils';
 
@@ -40,7 +41,7 @@ export interface CompraFormDialogData {
 
         <div class="grid-2">
           <label class="field">
-            <span>Inversión (€)</span>
+            <span>Inversión ({{ divisaSymbol() }})</span>
             <input
               type="number"
               step="0.01"
@@ -50,7 +51,7 @@ export interface CompraFormDialogData {
             />
           </label>
           <label class="field">
-            <span>Comisión (€)</span>
+            <span>Comisión ({{ divisaSymbol() }})</span>
             <input
               type="number"
               step="0.01"
@@ -63,7 +64,7 @@ export interface CompraFormDialogData {
 
         <div class="grid-2">
           <label class="field">
-            <span>Precio / acción (€)</span>
+            <span>Precio / acción ({{ divisaSymbol() }})</span>
             <input
               type="number"
               step="0.0001"
@@ -151,6 +152,9 @@ export class CompraFormDialogComponent {
   private readonly dialogRef = inject(MatDialogRef<CompraFormDialogComponent>);
   private readonly fb = inject(FormBuilder);
   private readonly inversionesService = inject(InversionesService);
+  private readonly categoriasConfig = inject(CategoriasConfigService);
+
+  readonly divisaSymbol = this.categoriasConfig.divisaSymbol;
 
   readonly form = this.fb.nonNullable.group({
     empresa: [

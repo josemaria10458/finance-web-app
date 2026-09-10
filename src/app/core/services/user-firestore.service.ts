@@ -219,6 +219,10 @@ export class UserFirestoreService {
           ingresos: Array.isArray(configRaw.ingresos)
             ? configRaw.ingresos
             : defaults.categoriasConfig.ingresos,
+          divisa:
+            typeof configRaw.divisa === 'string' && configRaw.divisa
+              ? configRaw.divisa
+              : defaults.categoriasConfig.divisa,
           onboardingCompleted: initialSetupCompleted,
         }
       : {

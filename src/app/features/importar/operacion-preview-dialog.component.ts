@@ -11,6 +11,7 @@ import {
   MatDialogRef,
 } from '@angular/material/dialog';
 import { OperacionBolsaInput } from '../../core/models';
+import { CategoriasConfigService } from '../../core/services/categorias-config.service';
 import { todayIso } from '../../core/utils/date.utils';
 
 export interface OperacionPreviewDialogData {
@@ -45,7 +46,7 @@ export interface OperacionPreviewDialogData {
 
         <div class="grid-2">
           <label class="field">
-            <span>Inversión (€)</span>
+            <span>Inversión ({{ divisaSymbol() }})</span>
             <input
               type="number"
               step="0.01"
@@ -55,7 +56,7 @@ export interface OperacionPreviewDialogData {
             />
           </label>
           <label class="field">
-            <span>Comisión (€)</span>
+            <span>Comisión ({{ divisaSymbol() }})</span>
             <input
               type="number"
               step="0.01"
@@ -68,7 +69,7 @@ export interface OperacionPreviewDialogData {
 
         <div class="grid-2">
           <label class="field">
-            <span>Precio / acción (€)</span>
+            <span>Precio / acción ({{ divisaSymbol() }})</span>
             <input
               type="number"
               step="0.0001"
@@ -91,7 +92,7 @@ export interface OperacionPreviewDialogData {
 
         @if (form.controls.tipo.value === 'venta') {
           <label class="field">
-            <span>Precio venta / acción (€)</span>
+            <span>Precio venta / acción ({{ divisaSymbol() }})</span>
             <input
               type="number"
               step="0.0001"
@@ -167,6 +168,9 @@ export class OperacionPreviewDialogComponent {
   private readonly dialogRef =
     inject(MatDialogRef<OperacionPreviewDialogComponent>);
   private readonly fb = inject(FormBuilder);
+  private readonly categoriasConfig = inject(CategoriasConfigService);
+
+  readonly divisaSymbol = this.categoriasConfig.divisaSymbol;
 
   readonly form = this.fb.nonNullable.group({
     empresa: [this.data.draft.empresa, Validators.required],

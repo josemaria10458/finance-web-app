@@ -68,6 +68,8 @@ export class GastosComponent {
   private readonly snackBar = inject(MatSnackBar);
 
   readonly categorias = this.categoriasConfig.categoriasGasto;
+  readonly divisa = this.categoriasConfig.divisa;
+  readonly divisaSymbol = this.categoriasConfig.divisaSymbol;
 
   readonly mesFiltro = signal<string | null>(null);
   readonly categoriaFiltro = signal<CategoriaGasto | 'todas'>('todas');
@@ -246,7 +248,7 @@ export class GastosComponent {
       panelClass: 'app-dialog',
       data: {
         titulo: 'Eliminar gasto',
-        mensaje: `¿Eliminar «${gasto.descripcion}» (${gasto.importe.toFixed(2)} €)?`,
+        mensaje: `¿Eliminar «${gasto.descripcion}» (${gasto.importe.toFixed(2)} ${this.divisaSymbol()})?`,
       },
     });
     ref.afterClosed().subscribe((ok) => {
