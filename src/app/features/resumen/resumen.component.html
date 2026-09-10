@@ -31,12 +31,12 @@
     <section class="kpi-grid" aria-label="Indicadores">
       <div class="kpi hero">
         <span>Patrimonio total</span>
-        <strong>{{ kpis().patrimonio | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</strong>
+        <strong>{{ kpis().patrimonio | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}</strong>
       </div>
       <div class="kpi">
         <span>Ahorro del periodo</span>
         <strong [class.neg]="kpis().ahorroNeto < 0">
-          {{ kpis().ahorroNeto | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+          {{ kpis().ahorroNeto | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}
         </strong>
       </div>
       <div class="kpi">

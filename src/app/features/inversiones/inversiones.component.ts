@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { OperacionBolsa, costeOperacion } from '../../core/models';
+import { CategoriasConfigService } from '../../core/services/categorias-config.service';
 import { FiltroAnioService } from '../../core/services/filtro-anio.service';
 import { InversionesService } from '../../core/services/inversiones.service';
 import { buildMonthOptions, formatMesLabel } from '../../core/utils/date.utils';
@@ -37,9 +38,12 @@ type OrdenDir = 'asc' | 'desc';
 })
 export class InversionesComponent {
   private readonly inversionesService = inject(InversionesService);
+  private readonly categoriasConfig = inject(CategoriasConfigService);
   private readonly filtroAnio = inject(FiltroAnioService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
+
+  readonly divisa = this.categoriasConfig.divisa;
 
   readonly vista = signal<Vista>('meses');
   readonly ordenCampo = signal<OrdenCampo>('fecha');

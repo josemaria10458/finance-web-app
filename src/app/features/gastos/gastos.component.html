@@ -33,7 +33,7 @@
 
   <section class="month-hero" aria-label="Total del mes">
     <span>{{ mesFiltro() ? 'Gastado en ' + labelMes(mesFiltro()!) : 'Total histórico' }}</span>
-    <strong>{{ totalMes() | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</strong>
+    <strong>{{ totalMes() | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}</strong>
   </section>
 
   <section class="cat-grid" aria-label="Gastos por categoría">
@@ -51,7 +51,7 @@
         </span>
         <span class="cat-body">
           <span class="cat-name">{{ c.categoria }}</span>
-          <strong>{{ c.total | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</strong>
+          <strong>{{ c.total | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}</strong>
           <span class="cat-pct">{{ c.pct | number: '1.0-0' }} % del mes</span>
         </span>
       </button>
@@ -73,7 +73,7 @@
         >
           <span class="sub-chip-name">{{ sub.nombre }}</span>
           <span class="sub-chip-amount">{{
-            sub.total | currency: 'EUR' : 'symbol' : '1.2-2' : 'es'
+            sub.total | currency: divisa() : 'symbol' : '1.2-2' : 'es'
           }}</span>
         </button>
       }
@@ -90,7 +90,7 @@
         {{ categoriaFiltro() }}
       }
     </h2>
-    <span>{{ totalFiltrado() | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</span>
+    <span>{{ totalFiltrado() | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}</span>
   </div>
 
   @if (gastosFiltrados().length === 0) {
@@ -119,7 +119,7 @@
                   g.descripcion
                 }}</span>
                 <span class="amount"
-                  >{{ g.importe | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</span
+                  >{{ g.importe | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}</span
                 >
               </span>
               <span class="row-meta">

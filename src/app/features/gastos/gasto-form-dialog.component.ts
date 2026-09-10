@@ -49,7 +49,7 @@ export interface GastoFormDialogData {
         </label>
 
         <label class="field">
-          <span>Importe (€)</span>
+          <span>Importe ({{ divisaSymbol() }})</span>
           <input
             type="number"
             step="0.01"
@@ -151,6 +151,7 @@ export class GastoFormDialogComponent {
   private readonly filtroAnio = inject(FiltroAnioService);
 
   readonly categorias = this.categoriasConfig.categoriasGasto;
+  readonly divisaSymbol = this.categoriasConfig.divisaSymbol;
 
   private readonly initial = this.data.gasto ?? this.data.draft;
   private readonly defaultCategoria =

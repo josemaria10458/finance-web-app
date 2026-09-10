@@ -2,6 +2,7 @@ import { CurrencyPipe, PercentPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { Chart, ChartConfiguration, Plugin } from 'chart.js';
 import { RangoResumen } from '../../core/models';
+import { CategoriasConfigService } from '../../core/services/categorias-config.service';
 import { FiltroAnioService } from '../../core/services/filtro-anio.service';
 import { ResumenService } from '../../core/services/resumen.service';
 import { ChartPanelComponent } from '../../shared/charts/chart-panel.component';
@@ -67,7 +68,10 @@ Chart.register(doughnutPercentPlugin);
 })
 export class ResumenComponent {
   private readonly resumenService = inject(ResumenService);
+  private readonly categoriasConfig = inject(CategoriasConfigService);
   private readonly filtroAnio = inject(FiltroAnioService);
+
+  readonly divisa = this.categoriasConfig.divisa;
 
   readonly rango = signal<RangoResumen>('anio');
   readonly rangos: { id: RangoResumen; label: string }[] = [
@@ -228,11 +232,11 @@ export class ResumenComponent {
               0
             );
             const pct = total > 0 ? (value / total) * 100 : 0;
-            const euros = value.toLocaleString('es-ES', {
+            const amount = value.toLocaleString('es-ES', {
               style: 'currency',
-              currency: 'EUR',
+              currency: this.divisa(),
             });
-            return ` ${euros} (${pct.toFixed(1)} %)`;
+            return ` ${amount} (${pct.toFixed(1)} %)`;
           },
         },
       },

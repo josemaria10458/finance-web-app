@@ -3,10 +3,34 @@
     <div>
       <h1>Configuración</h1>
       <p class="subtitle">
-        Añade o quita categorías de gastos e ingresos. Los cambios se guardan al momento.
+        Ajusta la divisa y las categorías de gastos e ingresos. Los cambios se
+        guardan al momento.
       </p>
     </div>
   </header>
+
+  <section class="block">
+    <h2>Divisa</h2>
+    <p class="hint">Moneda en la que se muestran todos los importes.</p>
+    <div class="divisa-grid" role="listbox" aria-label="Divisa">
+      @for (d of divisas; track d.code) {
+        <button
+          type="button"
+          class="divisa-option"
+          role="option"
+          [attr.aria-selected]="draft().divisa === d.code"
+          [class.selected]="draft().divisa === d.code"
+          (click)="setDivisa(d.code)"
+        >
+          <span class="divisa-symbol">{{ d.symbol }}</span>
+          <span class="divisa-meta">
+            <strong>{{ d.code }}</strong>
+            <span>{{ d.label }}</span>
+          </span>
+        </button>
+      }
+    </div>
+  </section>
 
   <section class="block">
     <h2>Categorías de gastos</h2>

@@ -9,6 +9,7 @@ import {
   IngresoInput,
   OperacionBolsaInput,
 } from '../../core/models';
+import { CategoriasConfigService } from '../../core/services/categorias-config.service';
 import {
   ImportPreview,
   ImportResult,
@@ -41,8 +42,11 @@ import { OperacionPreviewDialogComponent } from './operacion-preview-dialog.comp
 })
 export class ImportarComponent {
   private readonly importService = inject(ImportService);
+  private readonly categoriasConfig = inject(CategoriasConfigService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);
+
+  readonly divisa = this.categoriasConfig.divisa;
 
   readonly busy = signal(false);
   readonly dragOver = signal(false);

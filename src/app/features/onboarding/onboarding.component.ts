@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import {
   CategoriasConfig,
+  DIVISAS_DISPONIBLES,
   GastoCategoriaConfig,
 } from '../../core/models/categorias-config.model';
 import { AuthService } from '../../core/services/auth.service';
@@ -24,6 +25,7 @@ export class OnboardingComponent implements OnInit {
 
   readonly isEdit = signal(false);
   readonly signingOut = signal(false);
+  readonly divisas = DIVISAS_DISPONIBLES;
 
   readonly draft = signal<CategoriasConfig>(
     structuredClone(this.categorias.config())
@@ -37,6 +39,10 @@ export class OnboardingComponent implements OnInit {
     this.isEdit.set(
       this.route.snapshot.routeConfig?.path === 'configuracion'
     );
+  }
+
+  setDivisa(code: string): void {
+    this.draft.update((d) => ({ ...d, divisa: code }));
   }
 
   addCategoriaGasto(): void {
@@ -123,7 +129,7 @@ export class OnboardingComponent implements OnInit {
 
   async guardar(): Promise<void> {
     const draft = this.draft();
-    if (!draft.gastos.length || !draft.ingresos.length) return;
+    if (!draft.divisa || !draft.gastos.length || !draft.ingresos.length) return;
 
     if (this.isEdit()) {
       this.categorias.saveConfig({

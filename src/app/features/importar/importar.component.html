@@ -112,7 +112,7 @@
                   }</span
                 >
                 <span class="amount negative">{{
-                  g.importe | currency: 'EUR'
+                  g.importe | currency: divisa()
                 }}</span>
                 <span class="row-actions">
                   <button
@@ -148,7 +148,7 @@
                 <span class="desc">{{ i.descripcion }}</span>
                 <span class="cat">{{ i.categoria }}</span>
                 <span class="amount positive">{{
-                  i.importe | currency: 'EUR'
+                  i.importe | currency: divisa()
                 }}</span>
                 <span class="row-actions">
                   <button
@@ -186,7 +186,7 @@
                 <span class="desc">{{ o.empresa }}</span>
                 <span class="cat">{{ o.esVenta ? 'Venta' : 'Compra' }}</span>
                 <span class="amount">{{
-                  o.inversion | currency: 'EUR'
+                  o.inversion | currency: divisa()
                 }}</span>
                 <span class="row-actions">
                   <button

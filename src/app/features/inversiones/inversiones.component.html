@@ -30,7 +30,7 @@
   <section class="kpis" aria-label="Resumen de cartera">
     <div class="kpi main">
       <span>Capital invertido (abierto)</span>
-      <strong>{{ capitalAbierto() | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</strong>
+      <strong>{{ capitalAbierto() | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}</strong>
     </div>
     <div class="kpi">
       <span>Resultado ventas</span>
@@ -38,7 +38,7 @@
         [class.gain]="resultadoVentas() > 0"
         [class.loss]="resultadoVentas() < 0"
       >
-        {{ resultadoVentas() | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+        {{ resultadoVentas() | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}
       </strong>
     </div>
     <div class="kpi highlight-kpi">
@@ -68,7 +68,7 @@
         Impuestos {{ impuestosAnio() }}
       </span>
       <strong>
-        {{ impuestosAPagar() | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+        {{ impuestosAPagar() | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}
       </strong>
     </div>
   </section>
@@ -165,7 +165,7 @@
         <div class="month-kpi">
           <span>Invertido</span>
           <strong>{{
-            resumenMesActual().invertido | currency: 'EUR' : 'symbol' : '1.2-2' : 'es'
+            resumenMesActual().invertido | currency: divisa() : 'symbol' : '1.2-2' : 'es'
           }}</strong>
           <em>{{ resumenMesActual().numCompras }} compra(s)</em>
         </div>
@@ -176,7 +176,7 @@
             [class.loss]="resumenMesActual().resultado < 0"
           >
             {{
-              resumenMesActual().resultado | currency: 'EUR' : 'symbol' : '1.2-2' : 'es'
+              resumenMesActual().resultado | currency: divisa() : 'symbol' : '1.2-2' : 'es'
             }}
           </strong>
           <em>{{ resumenMesActual().numVentas }} venta(s)</em>
@@ -217,12 +217,12 @@
                   (click)="seleccionarMes(r.mesKey)"
                 >
                   <td>{{ r.mesLabel }}</td>
-                  <td>{{ r.invertido | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}</td>
+                  <td>{{ r.invertido | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}</td>
                   <td
                     [class.gain]="r.resultado > 0"
                     [class.loss]="r.resultado < 0"
                   >
-                    {{ r.resultado | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+                    {{ r.resultado | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}
                   </td>
                   <td
                     [class.gain]="(r.rentabilidadPct ?? 0) > 0"
@@ -273,9 +273,9 @@
                     [class.loss]="mov.tipo === 'venta' && mov.importe < 0"
                   >
                     @if (mov.tipo === 'compra') {
-                      −{{ mov.importe | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+                      −{{ mov.importe | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}
                     } @else {
-                      {{ mov.importe | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+                      {{ mov.importe | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}
                     }
                   </span>
                 </div>
@@ -344,9 +344,9 @@
                   "
                 >
                   @if (op.esVenta || op.precioVentaAccion != null) {
-                    {{ op.resultadoNeto | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+                    {{ op.resultadoNeto | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}
                   } @else {
-                    {{ coste(op) | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+                    {{ coste(op) | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}
                   }
                 </span>
               </div>
@@ -368,12 +368,12 @@
               <div class="prices">
                 <div>
                   <span>Precio compra</span>
-                  <strong>{{ op.precioCompraAccion | currency: 'EUR' : 'symbol' : '1.2-4' : 'es' }}</strong>
+                  <strong>{{ op.precioCompraAccion | currency: divisa() : 'symbol' : '1.2-4' : 'es' }}</strong>
                 </div>
                 @if (op.precioVentaAccion != null) {
                   <div>
                     <span>Precio venta</span>
-                    <strong>{{ op.precioVentaAccion | currency: 'EUR' : 'symbol' : '1.2-4' : 'es' }}</strong>
+                    <strong>{{ op.precioVentaAccion | currency: divisa() : 'symbol' : '1.2-4' : 'es' }}</strong>
                   </div>
                 }
                 @if (op.esVenta) {
@@ -440,7 +440,7 @@
                   [class.gain]="op.resultadoNeto >= 0"
                   [class.loss]="op.resultadoNeto < 0"
                 >
-                  {{ op.resultadoNeto | currency: 'EUR' : 'symbol' : '1.2-2' : 'es' }}
+                  {{ op.resultadoNeto | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}
                 </span>
               </div>
               <div class="row-meta">
@@ -459,11 +459,11 @@
               <div class="prices">
                 <div>
                   <span>Precio compra</span>
-                  <strong>{{ op.precioCompraAccion | currency: 'EUR' : 'symbol' : '1.2-4' : 'es' }}</strong>
+                  <strong>{{ op.precioCompraAccion | currency: divisa() : 'symbol' : '1.2-4' : 'es' }}</strong>
                 </div>
                 <div>
                   <span>Precio venta</span>
-                  <strong>{{ op.precioVentaAccion | currency: 'EUR' : 'symbol' : '1.2-4' : 'es' }}</strong>
+                  <strong>{{ op.precioVentaAccion | currency: divisa() : 'symbol' : '1.2-4' : 'es' }}</strong>
                 </div>
                 <div>
                   <span>Rentabilidad</span>

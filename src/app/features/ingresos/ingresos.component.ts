@@ -64,6 +64,8 @@ export class IngresosComponent {
   private readonly snackBar = inject(MatSnackBar);
 
   readonly categorias = this.categoriasConfig.categoriasIngreso;
+  readonly divisa = this.categoriasConfig.divisa;
+  readonly divisaSymbol = this.categoriasConfig.divisaSymbol;
 
   readonly mesFiltro = signal<string | null>(null);
   readonly categoriaFiltro = signal<CategoriaIngreso | 'todas'>('todas');
@@ -198,7 +200,7 @@ export class IngresosComponent {
       panelClass: 'app-dialog',
       data: {
         titulo: 'Eliminar ingreso',
-        mensaje: `¿Eliminar «${ingreso.descripcion}» (${ingreso.importe.toFixed(2)} €)?`,
+        mensaje: `¿Eliminar «${ingreso.descripcion}» (${ingreso.importe.toFixed(2)} ${this.divisaSymbol()})?`,
       },
     });
     ref.afterClosed().subscribe((ok) => {

@@ -45,7 +45,7 @@ export interface IngresoFormDialogData {
         </label>
 
         <label class="field">
-          <span>Importe (€)</span>
+          <span>Importe ({{ divisaSymbol() }})</span>
           <input
             type="number"
             step="0.01"
@@ -133,6 +133,7 @@ export class IngresoFormDialogComponent {
   private readonly categoriasConfig = inject(CategoriasConfigService);
 
   readonly categorias = this.categoriasConfig.categoriasIngreso;
+  readonly divisaSymbol = this.categoriasConfig.divisaSymbol;
 
   private readonly initial = this.data.ingreso ?? this.data.draft;
 

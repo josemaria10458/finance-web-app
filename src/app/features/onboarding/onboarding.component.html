@@ -11,11 +11,42 @@
           }
         </h1>
         <p>
-          Define las categorías y subcategorías de gastos e ingresos que
-          quieres usar. Podrás cambiarlas más adelante.
+          @if (isEdit()) {
+            Define las categorías y subcategorías de gastos e ingresos que
+            quieres usar. Podrás cambiarlas más adelante.
+          } @else {
+            Elige tu divisa y define las categorías de gastos e ingresos. Podrás
+            cambiarlo más adelante en Configuración.
+          }
         </p>
       </div>
     </header>
+
+    <section class="block">
+      <h2>Divisa</h2>
+      <p class="hint">
+        Todos los importes se mostrarán en esta moneda. Elige la que usas a
+        diario.
+      </p>
+      <div class="divisa-grid" role="listbox" aria-label="Divisa">
+        @for (d of divisas; track d.code) {
+          <button
+            type="button"
+            class="divisa-option"
+            role="option"
+            [attr.aria-selected]="draft().divisa === d.code"
+            [class.selected]="draft().divisa === d.code"
+            (click)="setDivisa(d.code)"
+          >
+            <span class="divisa-symbol">{{ d.symbol }}</span>
+            <span class="divisa-meta">
+              <strong>{{ d.code }}</strong>
+              <span>{{ d.label }}</span>
+            </span>
+          </button>
+        }
+      </div>
+    </section>
 
     <section class="block">
       <h2>Gastos</h2>
@@ -135,7 +166,9 @@
       <button
         type="button"
         class="btn-primary"
-        [disabled]="!draft().gastos.length || !draft().ingresos.length"
+        [disabled]="
+          !draft().divisa || !draft().gastos.length || !draft().ingresos.length
+        "
         (click)="guardar()"
       >
         @if (isEdit()) {

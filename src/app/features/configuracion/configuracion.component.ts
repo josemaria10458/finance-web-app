@@ -4,6 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import {
   CategoriasConfig,
+  DIVISAS_DISPONIBLES,
   GastoCategoriaConfig,
 } from '../../core/models/categorias-config.model';
 import { CategoriasConfigService } from '../../core/services/categorias-config.service';
@@ -19,6 +20,8 @@ export class ConfiguracionComponent {
   private readonly categorias = inject(CategoriasConfigService);
   private readonly snackBar = inject(MatSnackBar);
 
+  readonly divisas = DIVISAS_DISPONIBLES;
+
   readonly draft = signal<CategoriasConfig>(
     structuredClone(this.categorias.config())
   );
@@ -31,6 +34,11 @@ export class ConfiguracionComponent {
     effect(() => {
       this.draft.set(structuredClone(this.categorias.config()));
     });
+  }
+
+  setDivisa(code: string): void {
+    this.draft.update((d) => ({ ...d, divisa: code }));
+    this.persist();
   }
 
   addCategoriaGasto(): void {
