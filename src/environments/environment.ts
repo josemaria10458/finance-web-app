@@ -5,6 +5,11 @@
  */
 export const environment = {
   production: true,
+  /**
+   * API de mercado (carpeta `api/` de este repo, desplegada en Render).
+   * Sustituye la URL por la que te dé Render al crear el servicio.
+   */
+  marketApiBase: 'https://finanzas-market-api.onrender.com',
   firebase: {
     apiKey: "AIzaSyCiwD9LAVcWyYjNfCTGpYgjOUi3_CyRf3Y",
     authDomain: "login-app-448c2.firebaseapp.com",

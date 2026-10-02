@@ -1,0 +1,6 @@
+fastapi==0.142.2
+uvicorn[standard]==0.54.0
+httpx==0.28.1
+yfinance==1.7.0
+mstarpy==11.0.1
+pytr==0.4.10

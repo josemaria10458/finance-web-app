@@ -230,6 +230,12 @@
         <div><span>Ingresos</span><strong>{{ r.ingresos }}</strong></div>
         <div><span>Operaciones</span><strong>{{ r.operaciones }}</strong></div>
       </div>
+      @if (r.omitidos) {
+        <p class="hint">
+          {{ r.omitidos }} registro(s) del archivo ya estaban guardados y no se
+          han duplicado. El resto de meses se mantiene intacto.
+        </p>
+      }
     </section>
   }
 </div>

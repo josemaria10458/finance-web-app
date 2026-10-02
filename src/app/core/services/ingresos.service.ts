@@ -1,7 +1,16 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Ingreso, IngresoInput } from '../models';
 import { yearMonthKey } from '../utils/date.utils';
+import {
+  ImportMergeResult,
+  registrosNuevos,
+} from '../utils/import-merge.utils';
 import { UserFirestoreService } from './user-firestore.service';
+
+/** Dos ingresos con la misma clave son la misma fila del archivo importado. */
+function claveIngreso(i: Ingreso): string {
+  return [i.fecha, i.importe, i.categoria, i.descripcion].join('|');
+}
 
 @Injectable({ providedIn: 'root' })
 export class IngresosService {
@@ -71,15 +80,22 @@ export class IngresosService {
     this.persist(this._ingresos().filter((i) => i.id !== id));
   }
 
-  importMany(items: IngresoInput[], replace = false): number {
-    const nuevos = items.map((input) =>
+  importMany(items: IngresoInput[]): ImportMergeResult {
+    const actuales = this._ingresos();
+    const candidatos = items.map((input) =>
       this.normalize({
         ...input,
         id: crypto.randomUUID(),
       })
     );
-    this.persist(replace ? nuevos : [...nuevos, ...this._ingresos()]);
-    return nuevos.length;
+    const nuevos = registrosNuevos(actuales, candidatos, claveIngreso);
+    if (nuevos.length) {
+      this.persist([...nuevos, ...actuales]);
+    }
+    return {
+      importados: nuevos.length,
+      omitidos: candidatos.length - nuevos.length,
+    };
   }
 
   availableYearMonths(): string[] {

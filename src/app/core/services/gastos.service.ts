@@ -1,12 +1,27 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Gasto, GastoInput } from '../models';
 import { yearMonthKey } from '../utils/date.utils';
+import {
+  ImportMergeResult,
+  registrosNuevos,
+} from '../utils/import-merge.utils';
 import { CategoriasConfigService } from './categorias-config.service';
 import { UserFirestoreService } from './user-firestore.service';
 
 export interface SubcategoriaTotal {
   subcategoria: string;
   total: number;
+}
+
+/** Dos gastos con la misma clave son la misma fila del archivo importado. */
+function claveGasto(g: Gasto): string {
+  return [
+    g.fecha,
+    g.importe,
+    g.categoria,
+    g.subcategoria ?? '',
+    g.descripcion,
+  ].join('|');
 }
 
 @Injectable({ providedIn: 'root' })
@@ -70,15 +85,22 @@ export class GastosService {
     this.persist(this._gastos().filter((g) => g.id !== id));
   }
 
-  importMany(items: GastoInput[], replace = false): number {
-    const nuevos = items.map((input) =>
+  importMany(items: GastoInput[]): ImportMergeResult {
+    const actuales = this._gastos();
+    const candidatos = items.map((input) =>
       this.normalize({
         ...input,
         id: crypto.randomUUID(),
       })
     );
-    this.persist(replace ? nuevos : [...nuevos, ...this._gastos()]);
-    return nuevos.length;
+    const nuevos = registrosNuevos(actuales, candidatos, claveGasto);
+    if (nuevos.length) {
+      this.persist([...nuevos, ...actuales]);
+    }
+    return {
+      importados: nuevos.length,
+      omitidos: candidatos.length - nuevos.length,
+    };
   }
 
   totalsByCategoria(yearMonth: string | null): Record<string, number> {

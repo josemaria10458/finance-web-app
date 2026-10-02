@@ -5,6 +5,8 @@
  */
 export const environment = {
   production: false,
+  /** En desarrollo, `uvicorn app.main:app --reload --port 8000` en `api/`. */
+  marketApiBase: 'http://localhost:8000',
   firebase: {
     apiKey: "AIzaSyCiwD9LAVcWyYjNfCTGpYgjOUi3_CyRf3Y",
     authDomain: "login-app-448c2.firebaseapp.com",

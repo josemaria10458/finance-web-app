@@ -105,10 +105,15 @@ export class ImportarComponent {
       this.result.set(res);
       this.preview.set(null);
       const total = res.gastos + res.ingresos + res.operaciones;
+      const omitidos = res.omitidos
+        ? ` (${res.omitidos} ya estaban guardados)`
+        : '';
       this.snackBar.open(
         total
-          ? `Importados ${total} registros`
-          : 'No se importó ningún registro válido',
+          ? `Importados ${total} registros${omitidos}`
+          : res.omitidos
+            ? 'Todos los registros del archivo ya estaban guardados'
+            : 'No se importó ningún registro válido',
         'Cerrar',
         { duration: 3500 }
       );
