@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: finanzas-market-api
+    runtime: python
+    plan: free
+    rootDir: api
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: CORS_ORIGINS
+        value: https://josemaria10458.github.io,http://localhost:4200
+      - key: BASE_CURRENCY
+        value: USD
+      # La conexión con Trade Republic pide teléfono y PIN. Ponlo en "false"
+      # si prefieres que el servidor no acepte credenciales.
+      - key: TR_ENABLED
+        value: "true"

@@ -1,4 +1,5 @@
 import {
+  ClaseActivo,
   GastoInput,
   IngresoInput,
   OperacionBolsaInput,
@@ -198,6 +199,19 @@ function parseIngreso(row: TrRow, config: CategoriasConfig): IngresoInput | null
   };
 }
 
+const CLASES_ACTIVO: ClaseActivo[] = [
+  'FUND',
+  'STOCK',
+  'CRYPTO',
+  'BOND',
+  'OTHER',
+];
+
+function claseActivo(raw: string): ClaseActivo | undefined {
+  const upper = raw.trim().toUpperCase();
+  return CLASES_ACTIVO.find((c) => c === upper);
+}
+
 function consumeLots(
   lots: OpenLot[],
   sharesToSell: number,
@@ -241,8 +255,12 @@ function parseTradingRows(rows: TrRow[]): OperacionBolsaInput[] {
 
   for (const row of trading) {
     const type = str(row, 'type').toUpperCase();
+    // En el export de Trade Republic la columna `symbol` es el ISIN
+    // (o el ticker de la cripto, p. ej. «BTC»).
     const symbol = str(row, 'symbol') || str(row, 'name');
     const empresa = str(row, 'name') || symbol;
+    const isin = str(row, 'symbol') || undefined;
+    const clase = claseActivo(str(row, 'asset_class'));
     const fecha =
       parseFlexibleDate(row['date']) ?? parseFlexibleDate(row['datetime']);
     const shares = num(row, 'shares');
@@ -264,6 +282,8 @@ function parseTradingRows(rows: TrRow[]): OperacionBolsaInput[] {
 
       operaciones.push({
         empresa,
+        isin,
+        claseActivo: clase,
         fechaOperacion: fecha,
         inversion: Math.abs(amount),
         precioCompraAccion: price,
@@ -286,6 +306,8 @@ function parseTradingRows(rows: TrRow[]): OperacionBolsaInput[] {
 
       operaciones.push({
         empresa,
+        isin,
+        claseActivo: clase,
         fechaOperacion: fecha,
         fechaVenta: fecha,
         inversion,

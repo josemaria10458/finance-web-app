@@ -9,6 +9,10 @@ import {
 } from '../models';
 import { todayIso } from '../utils/date.utils';
 import {
+  ImportMergeResult,
+  registrosNuevos,
+} from '../utils/import-merge.utils';
+import {
   buildResumenMensual,
   mesPorDefecto,
   mesesConActividad,
@@ -17,6 +21,22 @@ import {
 } from '../utils/inversion-mensual.utils';
 import { xirrFromIso } from '../utils/xirr.utils';
 import { UserFirestoreService } from './user-firestore.service';
+
+/** Dos operaciones con la misma clave son la misma fila del archivo importado. */
+function claveOperacion(o: OperacionBolsa): string {
+  return [
+    o.empresa,
+    o.isin ?? '',
+    o.fechaOperacion,
+    o.inversion,
+    o.precioCompraAccion,
+    o.numeroAcciones,
+    o.comision,
+    o.precioVentaAccion ?? '',
+    o.fechaVenta ?? '',
+    o.esVenta === true,
+  ].join('|');
+}
 
 /**
  * Flujos de caja para XIRR según el libro del Excel:
@@ -398,8 +418,8 @@ export class InversionesService {
     this.persist([]);
   }
 
-  importMany(items: OperacionBolsaInput[], replace = false): number {
-    const nuevos: OperacionBolsa[] = items.map((input) => {
+  importMany(items: OperacionBolsaInput[]): ImportMergeResult {
+    const candidatos: OperacionBolsa[] = items.map((input) => {
       const shares = Math.abs(input.numeroAcciones);
       const comision = Math.abs(input.comision);
       const inversionBase =
@@ -444,8 +464,16 @@ export class InversionesService {
         rentabilidadPct,
       };
     });
-    this.persist(replace ? nuevos : [...nuevos, ...this._operaciones()]);
-    return nuevos.length;
+
+    const actuales = this._operaciones();
+    const nuevos = registrosNuevos(actuales, candidatos, claveOperacion);
+    if (nuevos.length) {
+      this.persist([...nuevos, ...actuales]);
+    }
+    return {
+      importados: nuevos.length,
+      omitidos: candidatos.length - nuevos.length,
+    };
   }
 
   private persist(operaciones: OperacionBolsa[]): void {

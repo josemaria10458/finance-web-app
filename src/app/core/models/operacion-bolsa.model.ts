@@ -1,6 +1,12 @@
+/** Tipo de activo tal y como lo etiqueta Trade Republic en su export. */
+export type ClaseActivo = 'FUND' | 'STOCK' | 'CRYPTO' | 'BOND' | 'OTHER';
+
 export interface OperacionBolsa {
   id: string;
   empresa: string;
+  /** ISIN del activo (o ticker en cripto); permite buscar su precio de mercado. */
+  isin?: string;
+  claseActivo?: ClaseActivo;
   fechaOperacion: string; // ISO date YYYY-MM-DD
   inversion: number;
   precioCompraAccion: number;

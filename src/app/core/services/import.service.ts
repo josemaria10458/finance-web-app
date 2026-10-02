@@ -26,6 +26,8 @@ export interface ImportResult {
   gastos: number;
   ingresos: number;
   operaciones: number;
+  /** Filas que ya estaban guardadas y no se han vuelto a añadir. */
+  omitidos: number;
   issues: ImportIssue[];
 }
 
@@ -56,11 +58,19 @@ export class ImportService {
     return { ...parsed, fileName: file.name };
   }
 
+  /**
+   * Añade lo que trae el archivo a lo que ya hay: los meses que no aparecen en
+   * el archivo se conservan y las filas ya guardadas no se duplican.
+   */
   commitPreview(preview: ImportPreview): ImportResult {
+    const gastos = this.gastosService.importMany(preview.gastos);
+    const ingresos = this.ingresosService.importMany(preview.ingresos);
+    const operaciones = this.inversionesService.importMany(preview.operaciones);
     return {
-      gastos: this.gastosService.importMany(preview.gastos, true),
-      ingresos: this.ingresosService.importMany(preview.ingresos, true),
-      operaciones: this.inversionesService.importMany(preview.operaciones, true),
+      gastos: gastos.importados,
+      ingresos: ingresos.importados,
+      operaciones: operaciones.importados,
+      omitidos: gastos.omitidos + ingresos.omitidos + operaciones.omitidos,
       issues: preview.issues,
     };
   }
