@@ -5,7 +5,9 @@ import { environment } from '../../../environments/environment';
 import {
   Cotizacion,
   FichaInstrumento,
+  HistoricoComparado,
   HistoricoPrecios,
+  LoteCartera,
   RangoHistorico,
   ResultadoBusqueda,
   TrCartera,
@@ -99,6 +101,26 @@ export class MercadoService {
           `${this.base}/history/${encodeURIComponent(identificador)}`,
           { params: { rango } }
         )
+      )
+    );
+  }
+
+  /**
+   * Evolución de la cartera junto a los índices, todo en base 100.
+   *
+   * Las compras se mandan en cada llamada porque el servidor no guarda nada:
+   * la cartera vive en Firestore y el cálculo es sin estado.
+   */
+  async historicoCartera(
+    lotes: LoteCartera[],
+    rango: RangoHistorico
+  ): Promise<HistoricoComparado> {
+    return this.pedir<HistoricoComparado>(() =>
+      firstValueFrom(
+        this.http.post<HistoricoComparado>(`${this.base}/portfolio/history`, {
+          lotes,
+          rango,
+        })
       )
     );
   }

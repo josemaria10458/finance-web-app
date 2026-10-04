@@ -16,6 +16,19 @@ Morningstar envían cabeceras CORS, así que el navegador no puede llamarlos.
 Morningstar es complementario: si falla o tarda, la ficha se sirve igualmente
 con los datos de Yahoo.
 
+## Cómo se compara la cartera con los índices
+
+Un índice se mueve solo por precio, pero el valor de una cartera también cambia
+porque se mete dinero nuevo, así que comparar valores haría que cada aportación
+pareciese una subida. `/portfolio/history` devuelve las tres líneas en base 100
+y para la cartera encadena sus variaciones diarias descontando lo aportado ese
+día, que es la rentabilidad ponderada por tiempo.
+
+Las aportaciones se valoran al precio de mercado del día en lugar de al coste
+registrado: así la serie no se descuadra si el coste venía en otra divisa o si
+Yahoo devuelve el histórico ajustado por splits. El servidor no guarda nada, de
+modo que las compras se envían en cada llamada.
+
 ## Endpoints
 
 | Método | Ruta | Descripción |
@@ -25,6 +38,7 @@ con los datos de Yahoo.
 | GET | `/quotes?ids=` | Cotizaciones en lote (ISIN o símbolo, separados por coma) |
 | GET | `/history/{id}?rango=` | Serie de cierres (`1d`…`max`) |
 | GET | `/instrument/{id}` | Ficha completa: cotización + Yahoo + Morningstar |
+| POST | `/portfolio/history` | Evolución de la cartera y de los índices, en base 100 |
 | POST | `/tr/login` | Paso 1 del acceso a Trade Republic (teléfono + PIN) |
 | POST | `/tr/status` | Estado del login mientras se aprueba en el móvil |
 | POST | `/tr/confirm` | Paso 2, solo si la cuenta usa app de códigos (TOTP) |

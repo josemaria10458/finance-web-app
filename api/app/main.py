@@ -13,7 +13,8 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from . import morningstar, trade_republic, yahoo
+from . import cartera, morningstar, trade_republic, yahoo
+from .cartera import CarteraError
 from .config import BASE_CURRENCY, CORS_ORIGINS, TR_ENABLED
 from .trade_republic import TradeRepublicError
 from .yahoo import YahooError
@@ -238,6 +239,34 @@ async def _vacio() -> dict[str, Any]:
     return {}
 
 
+class LoteRequest(BaseModel):
+    id: str = Field(description="ISIN o símbolo de Yahoo del activo")
+    fecha: str = Field(description="Fecha de la compra, yyyy-mm-dd")
+    acciones: float
+
+
+class CarteraHistoryRequest(BaseModel):
+    lotes: list[LoteRequest]
+    rango: str = "1y"
+
+
+@app.post("/portfolio/history")
+async def portfolio_history(body: CarteraHistoryRequest) -> dict[str, Any]:
+    """Evolución de la cartera junto a los índices, todo en base 100.
+
+    Recibe las compras porque el servidor no guarda nada del usuario: la cartera
+    vive en el navegador y se manda solo lo necesario para hacer el cálculo.
+    """
+    try:
+        return await cartera.historico_comparado(
+            [lote.model_dump() for lote in body.lotes], rango=body.rango
+        )
+    except CarteraError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except YahooError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
 # --------------------------------------------------------------------------- #
 # Trade Republic (opcional)
 # --------------------------------------------------------------------------- #
@@ -302,13 +331,26 @@ async def tr_logout(body: SessionRequest) -> dict[str, Any]:
 async def tr_portfolio(body: SessionRequest) -> dict[str, Any]:
     _exigir_tr()
     try:
-        cartera = await trade_republic.cartera(body.sessionId)
+        datos = await trade_republic.cartera(body.sessionId)
     except TradeRepublicError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Las posiciones de Trade Republic vienen en EUR, pero aun así se enriquecen
-    # con la cotización para mostrar precio actual y variación del día.
-    isins = [p["isin"] for p in cartera["posiciones"] if p.get("isin")]
+    # Trade Republic da el coste en la divisa de la cuenta (euros) mientras que
+    # las cotizaciones llegan en la divisa base, así que hay que igualarlas o la
+    # plusvalía saldría de restar dos monedas distintas. Su export no trae la
+    # fecha de cada compra, por lo que solo se puede aplicar el cambio de hoy.
+    divisa_cuenta = next(
+        (c["moneda"] for c in datos["efectivo"] if c.get("moneda")), "EUR"
+    )
+    cambio = 1.0
+    if divisa_cuenta != BASE_CURRENCY:
+        cambio = await yahoo.tipo_cambio(divisa_cuenta, BASE_CURRENCY) or 1.0
+        for posicion in datos["posiciones"]:
+            for campo in ("precioMedio", "costeTotal"):
+                if posicion.get(campo) is not None:
+                    posicion[campo] *= cambio
+
+    isins = [p["isin"] for p in datos["posiciones"] if p.get("isin")]
     cotizaciones: dict[str, Any] = {}
     if isins:
         resultados = await asyncio.gather(
@@ -318,7 +360,7 @@ async def tr_portfolio(body: SessionRequest) -> dict[str, Any]:
             if not isinstance(resultado, BaseException):
                 cotizaciones[isin] = resultado
 
-    for posicion in cartera["posiciones"]:
+    for posicion in datos["posiciones"]:
         cotizacion = cotizaciones.get(posicion.get("isin") or "")
         precio = (cotizacion or {}).get("precioBase")
         posicion["precioActual"] = precio
@@ -333,5 +375,7 @@ async def tr_portfolio(body: SessionRequest) -> dict[str, Any]:
             posicion["valorMercado"] = None
             posicion["plusvalia"] = None
 
-    cartera["divisaBase"] = BASE_CURRENCY
-    return cartera
+    datos["divisaBase"] = BASE_CURRENCY
+    datos["divisaCuenta"] = divisa_cuenta
+    datos["cambioAplicado"] = cambio
+    return datos
