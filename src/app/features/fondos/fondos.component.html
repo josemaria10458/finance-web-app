@@ -261,12 +261,18 @@
                 {{ trOcupado() ? 'Conectando…' : 'Continuar' }}
               </button>
             </div>
+          } @else if (trFase() === 'esperando-app') {
+            <div class="loading" role="status">
+              <mat-icon class="spin">phonelink_lock</mat-icon>
+              <p>Esperando a que apruebes el acceso en la app…</p>
+              <button class="btn-ghost" type="button" (click)="trSalir()">
+                Cancelar
+              </button>
+            </div>
           } @else {
             <div class="form-row">
               <label class="field">
-                <span>
-                  {{ trNecesitaAutenticador() ? 'Código del autenticador' : 'Código recibido' }}
-                </span>
+                <span>Código del autenticador</span>
                 <input
                   type="text"
                   inputmode="numeric"
@@ -283,16 +289,6 @@
               >
                 {{ trOcupado() ? 'Validando…' : 'Confirmar' }}
               </button>
-              @if (!trNecesitaAutenticador()) {
-                <button
-                  class="btn-ghost"
-                  type="button"
-                  [disabled]="trOcupado()"
-                  (click)="trReenviar()"
-                >
-                  Reenviar código
-                </button>
-              }
             </div>
           }
 

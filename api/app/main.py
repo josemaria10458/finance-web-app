@@ -283,11 +283,12 @@ async def tr_confirm(body: ConfirmRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.post("/tr/resend")
-async def tr_resend(body: SessionRequest) -> dict[str, Any]:
+@app.post("/tr/status")
+async def tr_status(body: SessionRequest) -> dict[str, Any]:
+    """Estado del login. El frontend lo consulta mientras se aprueba en el móvil."""
     _exigir_tr()
     try:
-        return await trade_republic.reenviar_codigo(body.sessionId)
+        return await trade_republic.estado_sesion(body.sessionId)
     except TradeRepublicError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
