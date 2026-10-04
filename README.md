@@ -7,6 +7,8 @@ This project was generated using [Angular CLI](https://github.com/angular/angula
 To start a local development server, run:
 
 ```bash
+cd C:\Users\joseo\finance-web-app\finance-web-app\api
+.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
 ng serve
 ```
 

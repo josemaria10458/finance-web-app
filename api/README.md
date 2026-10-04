@@ -47,15 +47,30 @@ campo `precioBase` lo devuelve convertido a `BASE_CURRENCY`.
 
 ## Desarrollo
 
-```bash
+La primera vez hay que crear el entorno e instalar las dependencias:
+
+```powershell
 cd api
 python -m venv .venv
-.venv/Scripts/activate        # Windows
+.\.venv\Scripts\Activate.ps1      # en bash: source .venv/Scripts/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
 ```
 
-Documentación interactiva en <http://localhost:8000/docs>.
+A partir de ahí, para arrancar basta con:
+
+```powershell
+cd api
+.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
+```
+
+Llamar al Python del entorno por su ruta evita tener que activarlo y funciona
+aunque `python` no esté en el `PATH`.
+
+Para comprobar que responde: <http://localhost:8000/health>. Documentación
+interactiva en <http://localhost:8000/docs>.
+
+El frontend en modo desarrollo (`npm start`) ya apunta a `http://localhost:8000`,
+así que con el backend levantado la pestaña **Bolsa** funciona sin tocar nada.
 
 ## Despliegue en Render
 
