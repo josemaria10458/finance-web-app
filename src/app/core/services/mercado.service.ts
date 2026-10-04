@@ -9,6 +9,7 @@ import {
   RangoHistorico,
   ResultadoBusqueda,
   TrCartera,
+  TrEstadoSesion,
   TrLoginResultado,
 } from '../models';
 
@@ -125,9 +126,11 @@ export class MercadoService {
     );
   }
 
-  async trReenviarCodigo(sessionId: string): Promise<void> {
-    await this.pedir(() =>
-      firstValueFrom(this.http.post(`${this.base}/tr/resend`, { sessionId }))
+  async trEstado(sessionId: string): Promise<TrEstadoSesion> {
+    return this.pedir<TrEstadoSesion>(() =>
+      firstValueFrom(
+        this.http.post<TrEstadoSesion>(`${this.base}/tr/status`, { sessionId })
+      )
     );
   }
 

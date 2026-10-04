@@ -111,11 +111,25 @@ export type RangoHistorico = (typeof RANGOS_HISTORICO)[number]['valor'];
 // Trade Republic
 // --------------------------------------------------------------------------- //
 
+/**
+ * Cómo pide Trade Republic el segundo factor: `app` se aprueba desde el móvil
+ * y no tiene código; `autenticador` espera un TOTP.
+ */
+export type TrMetodo = 'app' | 'autenticador';
+
+export type TrEstado = 'esperando' | 'codigo' | 'confirmada' | 'error';
+
 export interface TrLoginResultado {
   sessionId: string;
-  segundosParaSms: number;
-  necesitaAutenticador: boolean;
+  metodo: TrMetodo;
+  segundosParaConfirmar: number;
   mensaje: string;
+}
+
+export interface TrEstadoSesion {
+  estado: TrEstado;
+  metodo: TrMetodo;
+  mensaje: string | null;
 }
 
 export interface TrPosicion {

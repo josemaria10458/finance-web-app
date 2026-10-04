@@ -1,5 +1,12 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -23,7 +30,10 @@ import {
 } from '../../core/utils/cartera.utils';
 
 type Pestana = 'cartera' | 'bolsa';
-type FaseTradeRepublic = 'desconectado' | 'codigo' | 'conectado';
+type FaseTradeRepublic = 'desconectado' | 'esperando-app' | 'codigo' | 'conectado';
+
+/** Cada cuánto se pregunta al servidor si ya se aprobó el acceso en el móvil. */
+const MS_SONDEO_TR = 2000;
 
 /** Divisa en la que están las operaciones importadas de Trade Republic. */
 const DIVISA_OPERACIONES = 'EUR';
@@ -41,7 +51,7 @@ const DIVISA_OPERACIONES = 'EUR';
   templateUrl: './fondos.component.html',
   styleUrl: './fondos.component.css',
 })
-export class FondosComponent implements OnInit {
+export class FondosComponent implements OnInit, OnDestroy {
   private readonly mercado = inject(MercadoService);
   private readonly inversiones = inject(InversionesService);
 
@@ -72,9 +82,9 @@ export class FondosComponent implements OnInit {
   readonly trMensaje = signal<string | null>(null);
   readonly trError = signal<string | null>(null);
   readonly trOcupado = signal(false);
-  readonly trNecesitaAutenticador = signal(false);
   readonly trCartera = signal<TrCartera | null>(null);
   private trSessionId: string | null = null;
+  private trSondeo: ReturnType<typeof setInterval> | null = null;
 
   // ----------------------------------------------------------------------- //
   // Bolsa
@@ -139,6 +149,10 @@ export class FondosComponent implements OnInit {
     if (this.hayOperaciones()) {
       void this.cargarCartera();
     }
+  }
+
+  ngOnDestroy(): void {
+    this.pararSondeoTr();
   }
 
   cambiarPestana(pestana: Pestana): void {
@@ -257,11 +271,18 @@ export class FondosComponent implements OnInit {
     try {
       const res = await this.mercado.trLogin(telefono, pin);
       this.trSessionId = res.sessionId;
-      this.trNecesitaAutenticador.set(res.necesitaAutenticador);
       this.trMensaje.set(res.mensaje);
-      this.trFase.set('codigo');
       // El PIN ya no hace falta en el cliente.
       this.trPin.set('');
+
+      if (res.metodo === 'app') {
+        // No hay código que teclear: el aviso ya está en el móvil y el servidor
+        // sondea hasta que se aprueba, así que aquí solo se vigila el estado.
+        this.trFase.set('esperando-app');
+        this.arrancarSondeoTr();
+      } else {
+        this.trFase.set('codigo');
+      }
     } catch (e) {
       this.trError.set(
         e instanceof Error ? e.message : 'No se pudo iniciar sesión.'
@@ -273,16 +294,19 @@ export class FondosComponent implements OnInit {
 
   async trConfirmar(): Promise<void> {
     if (!this.trSessionId) return;
+    const codigo = this.trCodigo().trim();
+    if (!codigo) {
+      this.trError.set('Introduce el código de tu app de autenticación.');
+      return;
+    }
+
     this.trOcupado.set(true);
     this.trError.set(null);
     try {
-      await this.mercado.trConfirmar(
-        this.trSessionId,
-        this.trCodigo().trim() || null
-      );
-      this.trFase.set('conectado');
+      await this.mercado.trConfirmar(this.trSessionId, codigo);
       this.trCodigo.set('');
       this.trMensaje.set(null);
+      this.trFase.set('conectado');
       await this.cargarCarteraTradeRepublic();
     } catch (e) {
       this.trError.set(
@@ -293,19 +317,48 @@ export class FondosComponent implements OnInit {
     }
   }
 
-  async trReenviar(): Promise<void> {
-    if (!this.trSessionId) return;
-    this.trOcupado.set(true);
-    this.trError.set(null);
+  private arrancarSondeoTr(): void {
+    this.pararSondeoTr();
+    this.trSondeo = setInterval(() => void this.comprobarEstadoTr(), MS_SONDEO_TR);
+  }
+
+  private pararSondeoTr(): void {
+    if (this.trSondeo !== null) {
+      clearInterval(this.trSondeo);
+      this.trSondeo = null;
+    }
+  }
+
+  private async comprobarEstadoTr(): Promise<void> {
+    const sessionId = this.trSessionId;
+    if (!sessionId) {
+      this.pararSondeoTr();
+      return;
+    }
+
     try {
-      await this.mercado.trReenviarCodigo(this.trSessionId);
-      this.trMensaje.set('Código reenviado.');
+      const { estado, mensaje } = await this.mercado.trEstado(sessionId);
+      if (estado === 'confirmada') {
+        this.pararSondeoTr();
+        this.trMensaje.set(null);
+        this.trFase.set('conectado');
+        await this.cargarCarteraTradeRepublic();
+      } else if (estado === 'error') {
+        this.pararSondeoTr();
+        this.trFase.set('desconectado');
+        this.trMensaje.set(null);
+        this.trSessionId = null;
+        this.trError.set(
+          mensaje ?? 'Trade Republic no confirmó el acceso. Vuelve a intentarlo.'
+        );
+      }
     } catch (e) {
+      this.pararSondeoTr();
+      this.trFase.set('desconectado');
+      this.trSessionId = null;
       this.trError.set(
-        e instanceof Error ? e.message : 'No se pudo reenviar el código.'
+        e instanceof Error ? e.message : 'Se perdió la conexión con el servidor.'
       );
-    } finally {
-      this.trOcupado.set(false);
     }
   }
 
@@ -329,6 +382,7 @@ export class FondosComponent implements OnInit {
   }
 
   async trSalir(): Promise<void> {
+    this.pararSondeoTr();
     if (this.trSessionId) {
       await this.mercado.trCerrarSesion(this.trSessionId);
     }

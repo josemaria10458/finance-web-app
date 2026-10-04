@@ -26,8 +26,8 @@ con los datos de Yahoo.
 | GET | `/history/{id}?rango=` | Serie de cierres (`1d`…`max`) |
 | GET | `/instrument/{id}` | Ficha completa: cotización + Yahoo + Morningstar |
 | POST | `/tr/login` | Paso 1 del acceso a Trade Republic (teléfono + PIN) |
-| POST | `/tr/confirm` | Paso 2: código 2FA |
-| POST | `/tr/resend` | Reenvía el código |
+| POST | `/tr/status` | Estado del login mientras se aprueba en el móvil |
+| POST | `/tr/confirm` | Paso 2, solo si la cuenta usa app de códigos (TOTP) |
 | POST | `/tr/portfolio` | Posiciones y efectivo de la cuenta |
 | POST | `/tr/logout` | Cierra la sesión |
 
@@ -91,6 +91,20 @@ Notas del plan gratuito:
 
 No hay API oficial. `pytr` habla con la misma API que la web de Trade Republic,
 usando el login v2 para no necesitar Playwright ni Chromium en el servidor.
+
+El segundo factor tiene dos variantes y la elige Trade Republic según la cuenta.
+`/tr/login` devuelve en `metodo` cuál toca:
+
+- `app`: no hay ningún código. Llega un aviso al móvil y hay que aprobar el
+  acceso en la aplicación de Trade Republic. El servidor empieza a sondear el
+  proceso de login en cuanto se llama a `/tr/login`, y el frontend consulta
+  `/tr/status` hasta que el estado pasa a `confirmada`. La ventana para aprobar
+  es la que diga `segundosParaConfirmar` (unos dos minutos).
+- `autenticador`: la cuenta tiene una app de códigos TOTP y hay que mandar ese
+  código a `/tr/confirm`.
+
+Trade Republic retiró el reenvío de SMS junto con el login v1, así que no hay
+endpoint para pedir otro código.
 
 El teléfono y el PIN viajan al servicio, se usan para abrir la sesión y **no se
 guardan en disco** (`save_cookies=False`): viven en memoria mientras la sesión
