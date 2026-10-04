@@ -150,8 +150,35 @@ export interface TrEfectivo {
   importe: number | null;
 }
 
+/** Una compra, con lo mínimo que necesita la API para reconstruir la cartera. */
+export interface LoteCartera {
+  id: string;
+  fecha: string;
+  acciones: number;
+}
+
+/** Serie en base 100 con su rentabilidad, para comparar cartera e índices. */
+export interface SerieComparada {
+  clave: string;
+  nombre: string;
+  valores: (number | null)[];
+  totalPct: number | null;
+  anualPct: number | null;
+}
+
+export interface HistoricoComparado {
+  divisaBase: string;
+  rango: string;
+  fechas: string[];
+  series: SerieComparada[];
+}
+
 export interface TrCartera {
   posiciones: TrPosicion[];
   efectivo: TrEfectivo[];
   divisaBase: string;
+  /** Divisa de la cuenta de Trade Republic, en la que da el coste. */
+  divisaCuenta: string;
+  /** Cambio aplicado al coste para llevarlo a `divisaBase`. */
+  cambioAplicado: number;
 }

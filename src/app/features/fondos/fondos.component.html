@@ -123,6 +123,18 @@
                 {{ formatPct(t.plusvaliaPct) }}
               </strong>
             </article>
+            <article
+              class="kpi"
+              matTooltip="Rentabilidad anualizada, descontando las aportaciones para que sea comparable con un índice"
+            >
+              <span>Rentabilidad anual</span>
+              <strong
+                [class.pos]="(serieCartera()?.anualPct ?? 0) > 0"
+                [class.neg]="(serieCartera()?.anualPct ?? 0) < 0"
+              >
+                {{ formatPct(serieCartera()?.anualPct) }}
+              </strong>
+            </article>
           </section>
 
           @if (t.sinPrecio) {
@@ -131,6 +143,71 @@
             </p>
           }
         }
+
+        <section class="comparativa" aria-label="Evolución comparada">
+          <div class="presets" aria-label="Periodo del gráfico">
+            @for (r of rangos; track r.valor) {
+              <button
+                type="button"
+                class="preset-chip"
+                [class.active]="rangoCartera() === r.valor"
+                [disabled]="cargandoComparativa()"
+                (click)="cambiarRangoCartera(r.valor)"
+              >
+                {{ r.etiqueta }}
+              </button>
+            }
+          </div>
+
+          @if (cargandoComparativa() && !comparativa()) {
+            <div class="loading" role="status">
+              <mat-icon class="spin">sync</mat-icon>
+              <p>Calculando la evolución de tu cartera…</p>
+            </div>
+          } @else {
+            @if (errorComparativa(); as err) {
+              <div class="alert alert-error">
+                <mat-icon>error_outline</mat-icon>
+                <p>{{ err }}</p>
+              </div>
+            }
+
+              @if (datosComparativa(); as datos) {
+              <app-chart-panel
+                title="Tu cartera frente a los índices"
+                type="line"
+                [config]="datos"
+                [options]="opcionesComparativa"
+              />
+
+              <div class="kpis">
+                @for (s of comparativa()?.series ?? []; track s.clave) {
+                  <article class="kpi">
+                    <span>
+                      <i class="punto" [style.background]="colorSerie(s.clave)"></i>
+                      {{ s.nombre }}
+                    </span>
+                    <strong
+                      [class.pos]="(s.totalPct ?? 0) > 0"
+                      [class.neg]="(s.totalPct ?? 0) < 0"
+                    >
+                      {{ formatPct(s.totalPct) }}
+                    </strong>
+                    <small class="sub">{{ formatPct(s.anualPct) }} anual</small>
+                  </article>
+                }
+              </div>
+
+              <p class="disclaimer">
+                Todo en base 100 desde {{ comparativa()?.fechas?.[0] }}. La línea
+                de tu cartera encadena sus variaciones diarias descontando las
+                aportaciones del día, así que mide cómo se han comportado tus
+                activos y no cuánto has ingresado. Los índices van por precio, sin
+                dividendos.
+              </p>
+              }
+          }
+        </section>
 
         <section class="table-section" aria-label="Posiciones abiertas">
           <h2>Posiciones ({{ posiciones().length }})</h2>
@@ -318,15 +395,57 @@
           </div>
         } @else {
             @if (trCartera(); as c) {
-            @if (c.efectivo.length) {
-              <section class="kpis" aria-label="Efectivo">
-                @for (e of c.efectivo; track e.moneda) {
-                  <article class="kpi">
-                    <span>Efectivo ({{ e.moneda }})</span>
-                    <strong>{{ e.importe | number: '1.2-2' : 'es' }}</strong>
-                  </article>
-                }
-              </section>
+            <section class="kpis" aria-label="Resumen de la cuenta">
+              @for (e of c.efectivo; track e.moneda) {
+                <article class="kpi">
+                  <span>Efectivo ({{ e.moneda }})</span>
+                  <strong>{{ e.importe | number: '1.2-2' : 'es' }}</strong>
+                </article>
+              }
+              @if (totalesTr(); as t) {
+                <article class="kpi">
+                  <span>Valor de mercado</span>
+                  <strong>
+                    {{ t.valorMercado | number: '1.2-2' : 'es' }} {{ divisa() }}
+                  </strong>
+                </article>
+                <article class="kpi">
+                  <span>Plusvalía latente</span>
+                  <strong [class.pos]="t.plusvalia >= 0" [class.neg]="t.plusvalia < 0">
+                    {{ t.plusvalia | number: '1.2-2' : 'es' }} {{ divisa() }}
+                  </strong>
+                </article>
+                <article class="kpi">
+                  <span>Rentabilidad</span>
+                  <strong
+                    [class.pos]="(t.plusvaliaPct ?? 0) >= 0"
+                    [class.neg]="(t.plusvaliaPct ?? 0) < 0"
+                  >
+                    {{ formatPct(t.plusvaliaPct) }}
+                  </strong>
+                </article>
+                <article
+                  class="kpi"
+                  matTooltip="Se calcula con las compras importadas, porque el export de Trade Republic no trae la fecha de cada compra"
+                >
+                  <span>Rentabilidad anual</span>
+                  <strong
+                    [class.pos]="(serieCartera()?.anualPct ?? 0) > 0"
+                    [class.neg]="(serieCartera()?.anualPct ?? 0) < 0"
+                  >
+                    {{ formatPct(serieCartera()?.anualPct) }}
+                  </strong>
+                </article>
+              }
+            </section>
+
+            @if (c.cambioAplicado !== 1) {
+              <p class="disclaimer">
+                Trade Republic da el coste en {{ c.divisaCuenta }} y se ha pasado
+                a {{ divisa() }} con el cambio de hoy
+                ({{ c.cambioAplicado | number: '1.4-4' : 'es' }}), porque su
+                export no incluye la fecha de cada compra.
+              </p>
             }
 
             <section class="table-section" aria-label="Posiciones en Trade Republic">

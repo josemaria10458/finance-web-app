@@ -1,0 +1,42 @@
+name: Promover develop a master
+
+# Lleva lo que se empuja a develop hasta master y lanza la publicación en Pages.
+# El build no se repite aquí: lo hace `deploy-github-pages.yml`, que sigue
+# siendo el único sitio donde se define cómo se compila y se publica.
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: write # para empujar master
+  actions: write # para lanzar el workflow de despliegue
+
+# Sin cancel-in-progress: cada push tiene que llegar a master, aunque llegue
+# otro detrás. El despliegue sí descarta los intermedios, por su concurrency.
+concurrency:
+  group: promover-master
+
+jobs:
+  promover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fusionar develop en master
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin master
+          git switch master
+          git merge --no-edit origin/develop
+          git push origin master
+
+      # Un push hecho con GITHUB_TOKEN no dispara otros workflows, así que el
+      # despliegue no se enteraría de que master ha cambiado: hay que llamarlo.
+      - name: Publicar en GitHub Pages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy-github-pages.yml --ref master
