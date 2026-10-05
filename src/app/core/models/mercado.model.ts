@@ -100,6 +100,7 @@ export const RANGOS_HISTORICO = [
   { valor: '1mo', etiqueta: '1M' },
   { valor: '3mo', etiqueta: '3M' },
   { valor: '6mo', etiqueta: '6M' },
+  { valor: 'ytd', etiqueta: 'Año' },
   { valor: '1y', etiqueta: '1A' },
   { valor: '5y', etiqueta: '5A' },
   { valor: 'max', etiqueta: 'Máx' },
@@ -157,13 +158,22 @@ export interface LoteCartera {
   acciones: number;
 }
 
-/** Serie en base 100 con su rentabilidad, para comparar cartera e índices. */
+/** Serie en base 100 con sus rentabilidades, para comparar cartera e índices. */
 export interface SerieComparada {
   clave: string;
   nombre: string;
+  /** Valores del tramo dibujado, rebasados a 100 en su primer punto. */
   valores: (number | null)[];
+  /** Variación del tramo dibujado. */
   totalPct: number | null;
+  /** Anualizada del tramo dibujado. */
   anualPct: number | null;
+  /** Lo que llevas en el año en curso, desde el 1 de enero. */
+  ytdPct: number | null;
+  /** Desde la primera compra, sea cual sea el rango que se esté viendo. */
+  maxPct: number | null;
+  /** Anualizada desde la primera compra. */
+  maxAnualPct: number | null;
 }
 
 export interface HistoricoComparado {

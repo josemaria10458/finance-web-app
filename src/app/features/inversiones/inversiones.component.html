@@ -79,6 +79,16 @@
         type="button"
         role="tab"
         class="tab"
+        [class.active]="vista() === 'cartera'"
+        [attr.aria-selected]="vista() === 'cartera'"
+        (click)="setVista('cartera')"
+      >
+        Mi cartera
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="tab"
         [class.active]="vista() === 'meses'"
         [attr.aria-selected]="vista() === 'meses'"
         (click)="setVista('meses')"
@@ -109,7 +119,7 @@
       </button>
     </div>
 
-    @if (vista() !== 'meses') {
+    @if (vista() === 'historico' || vista() === 'ventas') {
       <div class="sort" role="group" aria-label="Ordenar">
         <button
           type="button"
@@ -137,7 +147,9 @@
     }
   </div>
 
-  @if (vista() === 'meses') {
+  @if (vista() === 'cartera') {
+    <app-cartera />
+  } @else if (vista() === 'meses') {
     @if (totalOps() === 0) {
       <div class="empty">
         <p class="empty-title">Sin operaciones</p>

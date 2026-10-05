@@ -1,0 +1,536 @@
+<div class="origen-row">
+  <div class="presets" aria-label="Origen de los datos">
+    <button
+      type="button"
+      class="preset-chip"
+      [class.active]="origen() === 'importado'"
+      (click)="cambiarOrigen('importado')"
+    >
+      Desde mis importaciones
+    </button>
+    <button
+      type="button"
+      class="preset-chip"
+      [class.active]="origen() === 'trade-republic'"
+      (click)="cambiarOrigen('trade-republic')"
+    >
+      Conectar con Trade Republic
+    </button>
+  </div>
+
+  <button
+    class="btn-primary"
+    type="button"
+    [disabled]="cargandoCartera()"
+    (click)="origen() === 'importado' ? cargarCartera() : cargarCarteraTradeRepublic()"
+  >
+    <mat-icon>{{ cargandoCartera() ? 'hourglass_top' : 'refresh' }}</mat-icon>
+    {{ cargandoCartera() ? 'Cargando…' : 'Actualizar' }}
+  </button>
+</div>
+
+@if (actualizado(); as fecha) {
+  <p class="disclaimer">
+    Precios de Yahoo Finance · actualizado a las
+    {{ fecha | date: 'HH:mm' }}. Las cotizaciones pueden llevar unos minutos
+    de retraso.
+  </p>
+}
+
+@if (errorCartera(); as err) {
+  <div class="alert alert-error">
+    <mat-icon>error_outline</mat-icon>
+    <p>{{ err }}</p>
+  </div>
+}
+
+<!-- Origen: operaciones importadas -->
+@if (origen() === 'importado') {
+  @if (!hayOperaciones()) {
+    <div class="empty">
+      <mat-icon>inbox</mat-icon>
+      <p>
+        No hay compras abiertas. Importa tu export de Trade Republic o tu
+        Excel desde <strong>Importar</strong> y volverá a aparecer aquí.
+      </p>
+    </div>
+  } @else if (cargandoCartera() && !posiciones().length) {
+    <div class="loading" role="status">
+      <mat-icon class="spin">sync</mat-icon>
+      <p>Valorando posiciones…</p>
+    </div>
+  } @else if (posiciones().length) {
+    @if (totales(); as t) {
+      <section class="kpis" aria-label="Resumen de la cartera">
+        <article class="kpi">
+          <span>Valor de mercado</span>
+          <strong>{{ t.valorMercado | number: '1.2-2' : 'es' }} {{ divisa() }}</strong>
+        </article>
+        <article class="kpi">
+          <span>Coste</span>
+          <strong>{{ t.coste | number: '1.2-2' : 'es' }} {{ divisa() }}</strong>
+        </article>
+        <article class="kpi">
+          <span>Plusvalía latente</span>
+          <strong [class.pos]="t.plusvalia >= 0" [class.neg]="t.plusvalia < 0">
+            {{ t.plusvalia | number: '1.2-2' : 'es' }} {{ divisa() }}
+          </strong>
+        </article>
+        <article class="kpi">
+          <span>Rentabilidad</span>
+          <strong
+            [class.pos]="(t.plusvaliaPct ?? 0) >= 0"
+            [class.neg]="(t.plusvaliaPct ?? 0) < 0"
+          >
+            {{ formatPct(t.plusvaliaPct) }}
+          </strong>
+        </article>
+        <article
+          class="kpi"
+          matTooltip="Variación desde el 1 de enero, descontando las aportaciones del año"
+        >
+          <span>En {{ anioActual }}</span>
+          <strong
+            [class.pos]="(serieCartera()?.ytdPct ?? 0) > 0"
+            [class.neg]="(serieCartera()?.ytdPct ?? 0) < 0"
+          >
+            {{ formatPct(serieCartera()?.ytdPct) }}
+          </strong>
+        </article>
+        <article
+          class="kpi"
+          matTooltip="Anualizada desde tu primera compra, descontando las aportaciones para que sea comparable con un índice"
+        >
+          <span>Rentabilidad anual</span>
+          <strong
+            [class.pos]="(serieCartera()?.maxAnualPct ?? 0) > 0"
+            [class.neg]="(serieCartera()?.maxAnualPct ?? 0) < 0"
+          >
+            {{ formatPct(serieCartera()?.maxAnualPct) }}
+          </strong>
+          <small class="sub">
+            {{ formatPct(serieCartera()?.maxPct) }} desde el inicio
+          </small>
+        </article>
+      </section>
+
+      @if (t.sinPrecio) {
+        <p class="disclaimer">
+          {{ t.sinPrecio }} posición(es) sin cotización: se valoran a su coste.
+        </p>
+      }
+    }
+
+    <section class="comparativa" aria-label="Evolución comparada">
+      <div class="presets" aria-label="Periodo del gráfico">
+        @for (r of rangos; track r.valor) {
+          <button
+            type="button"
+            class="preset-chip"
+            [class.active]="rangoCartera() === r.valor"
+            [disabled]="cargandoComparativa()"
+            (click)="cambiarRangoCartera(r.valor)"
+          >
+            {{ r.etiqueta }}
+          </button>
+        }
+      </div>
+
+      @if (cargandoComparativa() && !comparativa()) {
+        <div class="loading" role="status">
+          <mat-icon class="spin">sync</mat-icon>
+          <p>Calculando la evolución de tu cartera…</p>
+        </div>
+      } @else {
+        @if (errorComparativa(); as err) {
+          <div class="alert alert-error">
+            <mat-icon>error_outline</mat-icon>
+            <p>{{ err }}</p>
+          </div>
+        }
+
+          @if (datosComparativa(); as datos) {
+          <app-chart-panel
+            title="Tu cartera frente a los índices"
+            type="line"
+            [config]="datos"
+            [options]="opcionesComparativa"
+          />
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Serie</th>
+                  <th class="num">Periodo visto</th>
+                  <th class="num">En {{ anioActual }}</th>
+                  <th class="num">Desde el inicio</th>
+                  <th class="num">Anual desde el inicio</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (s of comparativa()?.series ?? []; track s.clave) {
+                  <tr>
+                    <td class="name-cell">
+                      <i class="punto" [style.background]="colorSerie(s.clave)"></i>
+                      <strong>{{ s.nombre }}</strong>
+                    </td>
+                    <td
+                      class="num"
+                      [class.pos]="(s.totalPct ?? 0) > 0"
+                      [class.neg]="(s.totalPct ?? 0) < 0"
+                    >
+                      {{ formatPct(s.totalPct) }}
+                    </td>
+                    <td
+                      class="num"
+                      [class.pos]="(s.ytdPct ?? 0) > 0"
+                      [class.neg]="(s.ytdPct ?? 0) < 0"
+                    >
+                      {{ formatPct(s.ytdPct) }}
+                    </td>
+                    <td
+                      class="num"
+                      [class.pos]="(s.maxPct ?? 0) > 0"
+                      [class.neg]="(s.maxPct ?? 0) < 0"
+                    >
+                      {{ formatPct(s.maxPct) }}
+                    </td>
+                    <td
+                      class="num"
+                      [class.pos]="(s.maxAnualPct ?? 0) > 0"
+                      [class.neg]="(s.maxAnualPct ?? 0) < 0"
+                    >
+                      {{ formatPct(s.maxAnualPct) }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <p class="disclaimer">
+            El gráfico va en base 100 desde {{ comparativa()?.fechas?.[0] }}.
+            «En {{ anioActual }}» y «desde el inicio» no dependen del periodo que
+            estés viendo: el primero cuenta desde el 1 de enero y el segundo desde
+            tu primera compra. La línea de tu cartera encadena sus variaciones
+            diarias descontando las aportaciones del día, así que mide cómo se han
+            comportado tus activos y no cuánto has ingresado. Los índices van por
+            precio, sin dividendos.
+          </p>
+          }
+      }
+    </section>
+
+    <section class="table-section" aria-label="Posiciones abiertas">
+      <h2>Posiciones ({{ posiciones().length }})</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Activo</th>
+              <th class="num">Títulos</th>
+              <th class="num">Precio medio</th>
+              <th class="num">Precio actual</th>
+              <th class="num">Día</th>
+              <th class="num">Valor</th>
+              <th class="num">Plusvalía</th>
+              <th class="num">Peso</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of posiciones(); track p.clave) {
+              <tr>
+                <td class="name-cell">
+                  <strong>{{ p.empresa }}</strong>
+                  <span class="cat">
+                    @if (p.isin) {
+                      {{ p.isin }}
+                    }
+                    @if (p.simbolo) {
+                      · {{ p.simbolo }}
+                    }
+                    · {{ p.lotes }} compra(s)
+                  </span>
+                </td>
+                <td class="num">{{ p.acciones | number: '1.0-6' : 'es' }}</td>
+                <td class="num">{{ p.precioMedio | number: '1.2-2' : 'es' }}</td>
+                <td class="num">
+                  @if (p.precioActual != null) {
+                    {{ p.precioActual | number: '1.2-2' : 'es' }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td
+                  class="num"
+                  [class.pos]="(p.variacionDiaPct ?? 0) > 0"
+                  [class.neg]="(p.variacionDiaPct ?? 0) < 0"
+                >
+                  {{ formatPct(p.variacionDiaPct) }}
+                </td>
+                <td class="num">
+                  @if (p.valorMercado != null) {
+                    {{ p.valorMercado | number: '1.2-2' : 'es' }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td
+                  class="num"
+                  [class.pos]="(p.plusvalia ?? 0) >= 0"
+                  [class.neg]="(p.plusvalia ?? 0) < 0"
+                >
+                  @if (p.plusvalia != null) {
+                    {{ p.plusvalia | number: '1.2-2' : 'es' }}
+                    <span class="sub">{{ formatPct(p.plusvaliaPct) }}</span>
+                  } @else {
+                    —
+                  }
+                </td>
+                <td class="num">{{ p.pesoPct | number: '1.0-1' : 'es' }} %</td>
+                <td>
+                  <button
+                    class="icon-btn"
+                    type="button"
+                    matTooltip="Ver ficha en Bolsa"
+                    [disabled]="!p.isin && !p.simbolo"
+                    (click)="verEnBolsa(p)"
+                  >
+                    <mat-icon>open_in_new</mat-icon>
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+}
+
+<!-- Origen: conexión real con Trade Republic -->
+@if (origen() === 'trade-republic') {
+  @if (trFase() !== 'conectado') {
+    <section class="tr-login" aria-label="Acceso a Trade Republic">
+      <h2>Conectar con Trade Republic</h2>
+      <p class="subtitle-inline">
+        Trade Republic no tiene API oficial: se usa la misma que su web. El
+        teléfono y el PIN se envían a tu propia API y no se guardan en disco.
+      </p>
+
+      @if (trFase() === 'desconectado') {
+        <div class="form-row">
+          <label class="field">
+            <span>Teléfono</span>
+            <input
+              type="tel"
+              placeholder="+34600111222"
+              autocomplete="username"
+              [ngModel]="trTelefono()"
+              (ngModelChange)="trTelefono.set($event)"
+            />
+          </label>
+          <label class="field">
+            <span>PIN</span>
+            <input
+              type="password"
+              inputmode="numeric"
+              autocomplete="current-password"
+              [ngModel]="trPin()"
+              (ngModelChange)="trPin.set($event)"
+            />
+          </label>
+          <button
+            class="btn-primary"
+            type="button"
+            [disabled]="trOcupado()"
+            (click)="trEntrar()"
+          >
+            {{ trOcupado() ? 'Conectando…' : 'Continuar' }}
+          </button>
+        </div>
+      } @else if (trFase() === 'esperando-app') {
+        <div class="loading" role="status">
+          <mat-icon class="spin">phonelink_lock</mat-icon>
+          <p>Esperando a que apruebes el acceso en la app…</p>
+          <button class="btn-ghost" type="button" (click)="trSalir()">
+            Cancelar
+          </button>
+        </div>
+      } @else {
+        <div class="form-row">
+          <label class="field">
+            <span>Código del autenticador</span>
+            <input
+              type="text"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              [ngModel]="trCodigo()"
+              (ngModelChange)="trCodigo.set($event)"
+            />
+          </label>
+          <button
+            class="btn-primary"
+            type="button"
+            [disabled]="trOcupado()"
+            (click)="trConfirmar()"
+          >
+            {{ trOcupado() ? 'Validando…' : 'Confirmar' }}
+          </button>
+        </div>
+      }
+
+      @if (trMensaje(); as msg) {
+        <p class="disclaimer">{{ msg }}</p>
+      }
+      @if (trError(); as err) {
+        <div class="alert alert-error">
+          <mat-icon>error_outline</mat-icon>
+          <p>{{ err }}</p>
+        </div>
+      }
+    </section>
+  } @else {
+    <div class="origen-row">
+      <p class="disclaimer">Sesión de Trade Republic activa.</p>
+      <button class="btn-ghost" type="button" (click)="trSalir()">
+        <mat-icon>logout</mat-icon>
+        Desconectar
+      </button>
+    </div>
+
+    @if (cargandoCartera()) {
+      <div class="loading" role="status">
+        <mat-icon class="spin">sync</mat-icon>
+        <p>Leyendo tu cartera en Trade Republic…</p>
+      </div>
+    } @else {
+        @if (trCartera(); as c) {
+        <section class="kpis" aria-label="Resumen de la cuenta">
+          @for (e of c.efectivo; track e.moneda) {
+            <article class="kpi">
+              <span>Efectivo ({{ e.moneda }})</span>
+              <strong>{{ e.importe | number: '1.2-2' : 'es' }}</strong>
+            </article>
+          }
+          @if (totalesTr(); as t) {
+            <article class="kpi">
+              <span>Valor de mercado</span>
+              <strong>
+                {{ t.valorMercado | number: '1.2-2' : 'es' }} {{ divisa() }}
+              </strong>
+            </article>
+            <article class="kpi">
+              <span>Plusvalía latente</span>
+              <strong [class.pos]="t.plusvalia >= 0" [class.neg]="t.plusvalia < 0">
+                {{ t.plusvalia | number: '1.2-2' : 'es' }} {{ divisa() }}
+              </strong>
+            </article>
+            <article class="kpi">
+              <span>Rentabilidad</span>
+              <strong
+                [class.pos]="(t.plusvaliaPct ?? 0) >= 0"
+                [class.neg]="(t.plusvaliaPct ?? 0) < 0"
+              >
+                {{ formatPct(t.plusvaliaPct) }}
+              </strong>
+            </article>
+              <article
+                class="kpi"
+                matTooltip="Se calcula con las compras importadas, porque el export de Trade Republic no trae la fecha de cada compra"
+              >
+                <span>Rentabilidad anual</span>
+                <strong
+                  [class.pos]="(serieCartera()?.maxAnualPct ?? 0) > 0"
+                  [class.neg]="(serieCartera()?.maxAnualPct ?? 0) < 0"
+                >
+                  {{ formatPct(serieCartera()?.maxAnualPct) }}
+                </strong>
+                <small class="sub">
+                  {{ formatPct(serieCartera()?.ytdPct) }} en {{ anioActual }}
+                </small>
+              </article>
+          }
+        </section>
+
+        @if (c.cambioAplicado !== 1) {
+          <p class="disclaimer">
+            Trade Republic da el coste en {{ c.divisaCuenta }} y se ha pasado
+            a {{ divisa() }} con el cambio de hoy
+            ({{ c.cambioAplicado | number: '1.4-4' : 'es' }}), porque su
+            export no incluye la fecha de cada compra.
+          </p>
+        }
+
+        <section class="table-section" aria-label="Posiciones en Trade Republic">
+          <h2>Posiciones ({{ c.posiciones.length }})</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Activo</th>
+                  <th class="num">Títulos</th>
+                  <th class="num">Precio medio</th>
+                  <th class="num">Precio actual</th>
+                  <th class="num">Día</th>
+                  <th class="num">Valor</th>
+                  <th class="num">Plusvalía</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (p of c.posiciones; track p.isin) {
+                  <tr>
+                    <td class="name-cell">
+                      <strong>{{ p.nombre }}</strong>
+                      <span class="cat">{{ p.isin }}</span>
+                    </td>
+                    <td class="num">{{ p.acciones | number: '1.0-6' : 'es' }}</td>
+                    <td class="num">{{ p.precioMedio | number: '1.2-2' : 'es' }}</td>
+                    <td class="num">
+                      @if (p.precioActual != null) {
+                        {{ p.precioActual | number: '1.2-2' : 'es' }}
+                      } @else {
+                        —
+                      }
+                    </td>
+                    <td
+                      class="num"
+                      [class.pos]="(p.variacionDiaPct ?? 0) > 0"
+                      [class.neg]="(p.variacionDiaPct ?? 0) < 0"
+                    >
+                      {{ formatPct(p.variacionDiaPct) }}
+                    </td>
+                    <td class="num">
+                      @if (p.valorMercado != null) {
+                        {{ p.valorMercado | number: '1.2-2' : 'es' }}
+                      } @else {
+                        —
+                      }
+                    </td>
+                    <td
+                      class="num"
+                      [class.pos]="(p.plusvalia ?? 0) >= 0"
+                      [class.neg]="(p.plusvalia ?? 0) < 0"
+                    >
+                      @if (p.plusvalia != null) {
+                        {{ p.plusvalia | number: '1.2-2' : 'es' }}
+                      } @else {
+                        —
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <p class="disclaimer">
+            El precio medio y el coste los da Trade Republic en euros; el precio
+            actual viene de Yahoo Finance en {{ divisa() }}.
+          </p>
+        </section>
+        }
+    }
+  }
+}

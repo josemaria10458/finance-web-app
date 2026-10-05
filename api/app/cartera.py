@@ -10,7 +10,7 @@ activos y no cuánto se ha ingresado.
 
 import asyncio
 import bisect
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from . import yahoo
@@ -70,12 +70,12 @@ def _por_dia(puntos: list[dict[str, Any]]) -> dict[str, float]:
     return serie
 
 
-async def _serie_cambio(desde: str, hasta: str, rango: str) -> _Escalonada | None:
-    desde, hasta = desde.upper(), hasta.upper()
-    if desde == hasta:
+async def _serie_cambio(moneda: str, base: str, inicio: str) -> _Escalonada | None:
+    moneda, base = moneda.upper(), base.upper()
+    if moneda == base:
         return None
     try:
-        datos = await yahoo.historico(f"{desde}{hasta}=X", rango)
+        datos = await yahoo.historico_desde(f"{moneda}{base}=X", inicio)
     except yahoo.YahooError:
         return None
     serie = _por_dia(datos["puntos"])
@@ -90,15 +90,15 @@ async def _simbolo_de(identificador: str) -> str | None:
     return identificador or None
 
 
-async def _cierres_en_base(simbolo: str, rango: str) -> dict[str, float]:
+async def _cierres_en_base(simbolo: str, inicio: str) -> dict[str, float]:
     """Cierres diarios de un símbolo, pasados a la divisa base."""
-    datos = await yahoo.historico(simbolo, rango)
+    datos = await yahoo.historico_desde(simbolo, inicio)
     serie = _por_dia(datos["puntos"])
     moneda = (datos.get("moneda") or BASE_CURRENCY).upper()
     if not serie or moneda == BASE_CURRENCY:
         return serie
 
-    cambio = await _serie_cambio(moneda, BASE_CURRENCY, rango)
+    cambio = await _serie_cambio(moneda, BASE_CURRENCY, inicio)
     if cambio is None:
         # Sin el cambio, mezclar divisas falsearía el total: mejor no aportar.
         return {}
@@ -117,21 +117,86 @@ def _calendario(series: list[list[str]]) -> list[str]:
     return sorted(fechas)
 
 
-def _rentabilidades(
-    fechas: list[str], valores: list[float | None]
-) -> tuple[float | None, float | None]:
-    """Rentabilidad total y anualizada de una serie que empieza en 100."""
-    ultimo = next((v for v in reversed(valores) if v is not None), None)
-    if ultimo is None:
-        return None, None
+#: Días naturales que cubre cada ventana del gráfico.
+_DIAS_RANGO = {
+    "1mo": 31,
+    "3mo": 92,
+    "6mo": 183,
+    "1y": 365,
+    "2y": 730,
+    "5y": 1826,
+    "10y": 3653,
+}
 
-    total = ultimo - 100.0
+
+def _desde_rango(rango: str, fechas: list[str]) -> int:
+    """Índice desde el que se recorta la serie para el rango pedido."""
+    if rango == "max" or not fechas:
+        return 0
+
+    ultima = date.fromisoformat(fechas[-1])
+    if rango == "ytd":
+        inicio = date(ultima.year, 1, 1)
+    else:
+        inicio = ultima - timedelta(days=_DIAS_RANGO.get(rango, 365))
+
+    # El primer punto en o después del inicio; si la cartera es más joven que
+    # la ventana, se devuelve entera.
+    return min(bisect.bisect_left(fechas, inicio.isoformat()), len(fechas) - 1)
+
+
+def _rebasar(valores: list[float | None], desde: int) -> list[float | None]:
+    """Recorta la serie y la vuelve a poner en base 100 en su nuevo inicio."""
+    recorte = valores[desde:]
+    base = next((v for v in recorte if v), None)
+    if not base:
+        return recorte
+    return [(v / base) * 100.0 if v else None for v in recorte]
+
+
+def _variacion(valores: list[float | None]) -> float | None:
+    """Variación en puntos porcentuales de una serie que empieza en 100."""
+    ultimo = next((v for v in reversed(valores) if v is not None), None)
+    return None if ultimo is None else ultimo - 100.0
+
+
+def _anualizada(fechas: list[str], valores: list[float | None]) -> float | None:
+    ultimo = next((v for v in reversed(valores) if v is not None), None)
+    if ultimo is None or ultimo <= 0 or len(fechas) < 2:
+        return None
     dias = (date.fromisoformat(fechas[-1]) - date.fromisoformat(fechas[0])).days
     # Anualizar unas pocas semanas daría cifras absurdas.
-    if dias < 90 or ultimo <= 0:
-        return total, None
-    anual = ((ultimo / 100.0) ** (365.0 / dias) - 1.0) * 100.0
-    return total, anual
+    if dias < 90:
+        return None
+    return ((ultimo / 100.0) ** (365.0 / dias) - 1.0) * 100.0
+
+
+def _serie(
+    clave: str,
+    nombre: str,
+    fechas: list[str],
+    completa: list[float | None],
+    desde: int,
+) -> dict[str, Any]:
+    """Serie lista para el gráfico, con la rentabilidad de cada periodo.
+
+    `completa` cubre desde la primera compra, y de ahí se saca tanto el tramo
+    que se dibuja como el año en curso y el total, todo con la misma base.
+    """
+    valores = _rebasar(completa, desde)
+    recortadas = fechas[desde:]
+    inicio_ano = _desde_rango("ytd", fechas)
+
+    return {
+        "clave": clave,
+        "nombre": nombre,
+        "valores": valores,
+        "totalPct": _variacion(valores),
+        "anualPct": _anualizada(recortadas, valores),
+        "ytdPct": _variacion(_rebasar(completa, inicio_ano)),
+        "maxPct": _variacion(completa),
+        "maxAnualPct": _anualizada(fechas, completa),
+    }
 
 
 async def historico_comparado(
@@ -158,13 +223,27 @@ async def historico_comparado(
     if not por_identificador:
         raise CarteraError("No se pudo identificar ninguno de los activos.")
 
+    # Se descarga siempre todo el histórico desde la primera compra y de ahí se
+    # recortan los rangos. Así el año en curso y el máximo salen de la misma
+    # serie diaria, en vez de pedir a Yahoo ventanas distintas que además
+    # devuelven granularidad semanal o mensual en los plazos largos.
+    primera = min(
+        (str(l.get("fecha") or "")[:10] for l in lotes if l.get("fecha")),
+        default="",
+    )
+    if not primera:
+        raise CarteraError("Las compras no traen fecha.")
+    # Un margen por detrás asegura que el primer día de cartera ya tenga
+    # cotización previa con la que comparar.
+    inicio = (date.fromisoformat(primera) - timedelta(days=15)).isoformat()
+
     activos, indices = await asyncio.gather(
         asyncio.gather(
-            *(_cierres_en_base(s, rango) for s in por_identificador.values()),
+            *(_cierres_en_base(s, inicio) for s in por_identificador.values()),
             return_exceptions=True,
         ),
         asyncio.gather(
-            *(_cierres_en_base(s, rango) for s, _ in REFERENCIAS),
+            *(_cierres_en_base(s, inicio) for s, _ in REFERENCIAS),
             return_exceptions=True,
         ),
     )
@@ -246,41 +325,28 @@ async def historico_comparado(
     if primero is None:
         raise CarteraError("No se pudo valorar la cartera en ninguna fecha.")
 
-    fechas = fechas[primero:]
-    valores_cartera = serie_cartera[primero:]
-    total, anual = _rentabilidades(fechas, valores_cartera)
+    # Serie completa (desde la primera compra) y el recorte que se va a dibujar.
+    fechas_completas = fechas[primero:]
+    completa_cartera = serie_cartera[primero:]
+    desde = _desde_rango(rango, fechas_completas)
+    fechas = fechas_completas[desde:]
 
-    series: list[dict[str, Any]] = [
-        {
-            "clave": "cartera",
-            "nombre": "Mi cartera",
-            "valores": valores_cartera,
-            "totalPct": total,
-            "anualPct": anual,
-        }
+    series = [
+        _serie("cartera", "Mi cartera", fechas_completas, completa_cartera, desde)
     ]
 
     for (simbolo, nombre), serie in zip(REFERENCIAS, series_indices):
         if not serie:
             continue
         escalonada = _Escalonada(serie)
-        base = escalonada.en_o_primero(fechas[0])
+        base = escalonada.en_o_primero(fechas_completas[0])
         if not base:
             continue
-        valores = [
+        completa = [
             (cierre / base) * 100.0 if (cierre := escalonada.en(f)) else None
-            for f in fechas
+            for f in fechas_completas
         ]
-        total_indice, anual_indice = _rentabilidades(fechas, valores)
-        series.append(
-            {
-                "clave": simbolo,
-                "nombre": nombre,
-                "valores": valores,
-                "totalPct": total_indice,
-                "anualPct": anual_indice,
-            }
-        )
+        series.append(_serie(simbolo, nombre, fechas_completas, completa, desde))
 
     return {
         "divisaBase": BASE_CURRENCY,

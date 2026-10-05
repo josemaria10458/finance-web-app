@@ -6,6 +6,7 @@ resuelve esa autenticación por su cuenta.
 """
 
 import asyncio
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -37,6 +38,7 @@ RANGOS = {
     "1mo": "1d",
     "3mo": "1d",
     "6mo": "1d",
+    "ytd": "1d",
     "1y": "1d",
     "2y": "1wk",
     "5y": "1wk",
@@ -264,6 +266,30 @@ async def convertir(importe: float | None, desde: str | None, hasta: str) -> flo
 # --------------------------------------------------------------------------- #
 
 
+def _parsear_chart(data: dict[str, Any], simbolo: str, rango: str) -> dict[str, Any]:
+    resultados = (data.get("chart") or {}).get("result") or []
+    if not resultados:
+        raise YahooError(f"Sin histórico para {simbolo}")
+
+    resultado = resultados[0]
+    meta = resultado.get("meta") or {}
+    marcas = resultado.get("timestamp") or []
+    indicadores = (resultado.get("indicators") or {}).get("quote") or [{}]
+    cierres = indicadores[0].get("close") or []
+
+    puntos = [
+        {"t": int(marca), "c": _num(cierre)}
+        for marca, cierre in zip(marcas, cierres)
+        if _num(cierre) is not None
+    ]
+    return {
+        "simbolo": meta.get("symbol") or simbolo.upper(),
+        "moneda": (meta.get("currency") or "").upper() or None,
+        "rango": rango,
+        "puntos": puntos,
+    }
+
+
 async def historico(simbolo: str, rango: str = "1y") -> dict[str, Any]:
     rango = rango if rango in RANGOS else "1y"
     clave = f"history:{simbolo.upper()}:{rango}"
@@ -273,27 +299,31 @@ async def historico(simbolo: str, rango: str = "1y") -> dict[str, Any]:
             CHART_URL.format(symbol=simbolo),
             {"range": rango, "interval": RANGOS[rango]},
         )
-        resultados = (data.get("chart") or {}).get("result") or []
-        if not resultados:
-            raise YahooError(f"Sin histórico para {simbolo}")
+        return _parsear_chart(data, simbolo, rango)
 
-        resultado = resultados[0]
-        meta = resultado.get("meta") or {}
-        marcas = resultado.get("timestamp") or []
-        indicadores = (resultado.get("indicators") or {}).get("quote") or [{}]
-        cierres = indicadores[0].get("close") or []
+    return await cache.get_or_set(clave, TTL_HISTORY, cargar)
 
-        puntos = [
-            {"t": int(marca), "c": _num(cierre)}
-            for marca, cierre in zip(marcas, cierres)
-            if _num(cierre) is not None
-        ]
-        return {
-            "simbolo": meta.get("symbol") or simbolo.upper(),
-            "moneda": (meta.get("currency") or "").upper() or None,
-            "rango": rango,
-            "puntos": puntos,
-        }
+
+async def historico_desde(simbolo: str, desde: str) -> dict[str, Any]:
+    """Cierres diarios desde una fecha concreta.
+
+    `range` solo acepta ventanas predefinidas y las más largas vienen con
+    granularidad semanal o mensual. La cartera necesita el detalle diario desde
+    la primera compra, así que se piden las fechas exactas con `period1`.
+    """
+    clave = f"history-desde:{simbolo.upper()}:{desde}"
+
+    async def cargar() -> dict[str, Any]:
+        inicio = datetime.fromisoformat(desde).replace(tzinfo=timezone.utc)
+        data = await _get_json(
+            CHART_URL.format(symbol=simbolo),
+            {
+                "period1": int(inicio.timestamp()),
+                "period2": int(datetime.now(tz=timezone.utc).timestamp()),
+                "interval": "1d",
+            },
+        )
+        return _parsear_chart(data, simbolo, f"desde {desde}")
 
     return await cache.get_or_set(clave, TTL_HISTORY, cargar)
 

@@ -3,809 +3,295 @@
     <div>
       <h1>Fondos &amp; ETFs</h1>
       <p class="subtitle">
-        Tu cartera valorada a precio de mercado y consulta en vivo de fondos,
-        ETFs y acciones. Importes en {{ divisa() }}.
+        Consulta en vivo de fondos, ETFs y acciones: precio, histórico, costes y
+        composición. Importes en {{ divisa() }}.
       </p>
     </div>
   </header>
 
-  <div class="tabs" role="tablist">
-    <button
-      type="button"
-      role="tab"
-      class="tab"
-      [class.active]="pestana() === 'cartera'"
-      [attr.aria-selected]="pestana() === 'cartera'"
-      (click)="cambiarPestana('cartera')"
-    >
-      <mat-icon>account_balance_wallet</mat-icon>
-      Mi cartera
-    </button>
-    <button
-      type="button"
-      role="tab"
-      class="tab"
-      [class.active]="pestana() === 'bolsa'"
-      [attr.aria-selected]="pestana() === 'bolsa'"
-      (click)="cambiarPestana('bolsa')"
-    >
-      <mat-icon>trending_up</mat-icon>
-      Bolsa
-    </button>
-  </div>
-
-  <!-- ==================== MI CARTERA ==================== -->
-  @if (pestana() === 'cartera') {
-    <div class="origen-row">
-      <div class="presets" aria-label="Origen de los datos">
-        <button
-          type="button"
-          class="preset-chip"
-          [class.active]="origen() === 'importado'"
-          (click)="cambiarOrigen('importado')"
-        >
-          Desde mis importaciones
-        </button>
-        <button
-          type="button"
-          class="preset-chip"
-          [class.active]="origen() === 'trade-republic'"
-          (click)="cambiarOrigen('trade-republic')"
-        >
-          Conectar con Trade Republic
-        </button>
-      </div>
-
+  <section class="buscador" aria-label="Buscar fondos, ETFs y acciones">
+    <div class="form-row">
+      <label class="field grow">
+        <span>Buscar por ISIN, ticker o nombre</span>
+        <input
+          type="search"
+          placeholder="IE00B4L5Y983, EUNL.DE, MSCI World…"
+          [ngModel]="consulta()"
+          (ngModelChange)="consulta.set($event)"
+          (keyup.enter)="buscar()"
+        />
+      </label>
       <button
         class="btn-primary"
         type="button"
-        [disabled]="cargandoCartera()"
-        (click)="origen() === 'importado' ? cargarCartera() : cargarCarteraTradeRepublic()"
+        [disabled]="buscando()"
+        (click)="buscar()"
       >
-        <mat-icon>{{ cargandoCartera() ? 'hourglass_top' : 'refresh' }}</mat-icon>
-        {{ cargandoCartera() ? 'Cargando…' : 'Actualizar' }}
+        <mat-icon>{{ buscando() ? 'hourglass_top' : 'search' }}</mat-icon>
+        {{ buscando() ? 'Buscando…' : 'Buscar' }}
       </button>
     </div>
 
-    @if (actualizado(); as fecha) {
-      <p class="disclaimer">
-        Precios de Yahoo Finance · actualizado a las
-        {{ fecha | date: 'HH:mm' }}. Las cotizaciones pueden llevar unos minutos
-        de retraso.
-      </p>
-    }
-
-    @if (errorCartera(); as err) {
+    @if (errorBusqueda(); as err) {
       <div class="alert alert-error">
         <mat-icon>error_outline</mat-icon>
         <p>{{ err }}</p>
       </div>
     }
+  </section>
 
-    <!-- Origen: operaciones importadas -->
-    @if (origen() === 'importado') {
-      @if (!hayOperaciones()) {
-        <div class="empty">
-          <mat-icon>inbox</mat-icon>
-          <p>
-            No hay compras abiertas. Importa tu export de Trade Republic o tu
-            Excel desde <strong>Importar</strong> y volverá a aparecer aquí.
-          </p>
-        </div>
-      } @else if (cargandoCartera() && !posiciones().length) {
-        <div class="loading" role="status">
-          <mat-icon class="spin">sync</mat-icon>
-          <p>Valorando posiciones…</p>
-        </div>
-      } @else if (posiciones().length) {
-        @if (totales(); as t) {
-          <section class="kpis" aria-label="Resumen de la cartera">
-            <article class="kpi">
-              <span>Valor de mercado</span>
-              <strong>{{ t.valorMercado | number: '1.2-2' : 'es' }} {{ divisa() }}</strong>
-            </article>
-            <article class="kpi">
-              <span>Coste</span>
-              <strong>{{ t.coste | number: '1.2-2' : 'es' }} {{ divisa() }}</strong>
-            </article>
-            <article class="kpi">
-              <span>Plusvalía latente</span>
-              <strong [class.pos]="t.plusvalia >= 0" [class.neg]="t.plusvalia < 0">
-                {{ t.plusvalia | number: '1.2-2' : 'es' }} {{ divisa() }}
-              </strong>
-            </article>
-            <article class="kpi">
-              <span>Rentabilidad</span>
-              <strong
-                [class.pos]="(t.plusvaliaPct ?? 0) >= 0"
-                [class.neg]="(t.plusvaliaPct ?? 0) < 0"
-              >
-                {{ formatPct(t.plusvaliaPct) }}
-              </strong>
-            </article>
-            <article
-              class="kpi"
-              matTooltip="Rentabilidad anualizada, descontando las aportaciones para que sea comparable con un índice"
-            >
-              <span>Rentabilidad anual</span>
-              <strong
-                [class.pos]="(serieCartera()?.anualPct ?? 0) > 0"
-                [class.neg]="(serieCartera()?.anualPct ?? 0) < 0"
-              >
-                {{ formatPct(serieCartera()?.anualPct) }}
-              </strong>
-            </article>
-          </section>
-
-          @if (t.sinPrecio) {
-            <p class="disclaimer">
-              {{ t.sinPrecio }} posición(es) sin cotización: se valoran a su coste.
-            </p>
-          }
-        }
-
-        <section class="comparativa" aria-label="Evolución comparada">
-          <div class="presets" aria-label="Periodo del gráfico">
-            @for (r of rangos; track r.valor) {
-              <button
-                type="button"
-                class="preset-chip"
-                [class.active]="rangoCartera() === r.valor"
-                [disabled]="cargandoComparativa()"
-                (click)="cambiarRangoCartera(r.valor)"
-              >
-                {{ r.etiqueta }}
-              </button>
-            }
-          </div>
-
-          @if (cargandoComparativa() && !comparativa()) {
-            <div class="loading" role="status">
-              <mat-icon class="spin">sync</mat-icon>
-              <p>Calculando la evolución de tu cartera…</p>
-            </div>
-          } @else {
-            @if (errorComparativa(); as err) {
-              <div class="alert alert-error">
-                <mat-icon>error_outline</mat-icon>
-                <p>{{ err }}</p>
-              </div>
-            }
-
-              @if (datosComparativa(); as datos) {
-              <app-chart-panel
-                title="Tu cartera frente a los índices"
-                type="line"
-                [config]="datos"
-                [options]="opcionesComparativa"
-              />
-
-              <div class="kpis">
-                @for (s of comparativa()?.series ?? []; track s.clave) {
-                  <article class="kpi">
-                    <span>
-                      <i class="punto" [style.background]="colorSerie(s.clave)"></i>
-                      {{ s.nombre }}
-                    </span>
-                    <strong
-                      [class.pos]="(s.totalPct ?? 0) > 0"
-                      [class.neg]="(s.totalPct ?? 0) < 0"
-                    >
-                      {{ formatPct(s.totalPct) }}
-                    </strong>
-                    <small class="sub">{{ formatPct(s.anualPct) }} anual</small>
-                  </article>
-                }
-              </div>
-
-              <p class="disclaimer">
-                Todo en base 100 desde {{ comparativa()?.fechas?.[0] }}. La línea
-                de tu cartera encadena sus variaciones diarias descontando las
-                aportaciones del día, así que mide cómo se han comportado tus
-                activos y no cuánto has ingresado. Los índices van por precio, sin
-                dividendos.
-              </p>
-              }
-          }
-        </section>
-
-        <section class="table-section" aria-label="Posiciones abiertas">
-          <h2>Posiciones ({{ posiciones().length }})</h2>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Activo</th>
-                  <th class="num">Títulos</th>
-                  <th class="num">Precio medio</th>
-                  <th class="num">Precio actual</th>
-                  <th class="num">Día</th>
-                  <th class="num">Valor</th>
-                  <th class="num">Plusvalía</th>
-                  <th class="num">Peso</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (p of posiciones(); track p.clave) {
-                  <tr>
-                    <td class="name-cell">
-                      <strong>{{ p.empresa }}</strong>
-                      <span class="cat">
-                        @if (p.isin) {
-                          {{ p.isin }}
-                        }
-                        @if (p.simbolo) {
-                          · {{ p.simbolo }}
-                        }
-                        · {{ p.lotes }} compra(s)
-                      </span>
-                    </td>
-                    <td class="num">{{ p.acciones | number: '1.0-6' : 'es' }}</td>
-                    <td class="num">{{ p.precioMedio | number: '1.2-2' : 'es' }}</td>
-                    <td class="num">
-                      @if (p.precioActual != null) {
-                        {{ p.precioActual | number: '1.2-2' : 'es' }}
-                      } @else {
-                        —
-                      }
-                    </td>
-                    <td
-                      class="num"
-                      [class.pos]="(p.variacionDiaPct ?? 0) > 0"
-                      [class.neg]="(p.variacionDiaPct ?? 0) < 0"
-                    >
-                      {{ formatPct(p.variacionDiaPct) }}
-                    </td>
-                    <td class="num">
-                      @if (p.valorMercado != null) {
-                        {{ p.valorMercado | number: '1.2-2' : 'es' }}
-                      } @else {
-                        —
-                      }
-                    </td>
-                    <td
-                      class="num"
-                      [class.pos]="(p.plusvalia ?? 0) >= 0"
-                      [class.neg]="(p.plusvalia ?? 0) < 0"
-                    >
-                      @if (p.plusvalia != null) {
-                        {{ p.plusvalia | number: '1.2-2' : 'es' }}
-                        <span class="sub">{{ formatPct(p.plusvaliaPct) }}</span>
-                      } @else {
-                        —
-                      }
-                    </td>
-                    <td class="num">{{ p.pesoPct | number: '1.0-1' : 'es' }} %</td>
-                    <td>
-                      <button
-                        class="icon-btn"
-                        type="button"
-                        matTooltip="Ver ficha en Bolsa"
-                        [disabled]="!p.isin && !p.simbolo"
-                        (click)="verEnBolsa(p)"
-                      >
-                        <mat-icon>open_in_new</mat-icon>
-                      </button>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        </section>
-      }
-    }
-
-    <!-- Origen: conexión real con Trade Republic -->
-    @if (origen() === 'trade-republic') {
-      @if (trFase() !== 'conectado') {
-        <section class="tr-login" aria-label="Acceso a Trade Republic">
-          <h2>Conectar con Trade Republic</h2>
-          <p class="subtitle-inline">
-            Trade Republic no tiene API oficial: se usa la misma que su web. El
-            teléfono y el PIN se envían a tu propia API y no se guardan en disco.
-          </p>
-
-          @if (trFase() === 'desconectado') {
-            <div class="form-row">
-              <label class="field">
-                <span>Teléfono</span>
-                <input
-                  type="tel"
-                  placeholder="+34600111222"
-                  autocomplete="username"
-                  [ngModel]="trTelefono()"
-                  (ngModelChange)="trTelefono.set($event)"
-                />
-              </label>
-              <label class="field">
-                <span>PIN</span>
-                <input
-                  type="password"
-                  inputmode="numeric"
-                  autocomplete="current-password"
-                  [ngModel]="trPin()"
-                  (ngModelChange)="trPin.set($event)"
-                />
-              </label>
-              <button
-                class="btn-primary"
-                type="button"
-                [disabled]="trOcupado()"
-                (click)="trEntrar()"
-              >
-                {{ trOcupado() ? 'Conectando…' : 'Continuar' }}
-              </button>
-            </div>
-          } @else if (trFase() === 'esperando-app') {
-            <div class="loading" role="status">
-              <mat-icon class="spin">phonelink_lock</mat-icon>
-              <p>Esperando a que apruebes el acceso en la app…</p>
-              <button class="btn-ghost" type="button" (click)="trSalir()">
-                Cancelar
-              </button>
-            </div>
-          } @else {
-            <div class="form-row">
-              <label class="field">
-                <span>Código del autenticador</span>
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  autocomplete="one-time-code"
-                  [ngModel]="trCodigo()"
-                  (ngModelChange)="trCodigo.set($event)"
-                />
-              </label>
-              <button
-                class="btn-primary"
-                type="button"
-                [disabled]="trOcupado()"
-                (click)="trConfirmar()"
-              >
-                {{ trOcupado() ? 'Validando…' : 'Confirmar' }}
-              </button>
-            </div>
-          }
-
-          @if (trMensaje(); as msg) {
-            <p class="disclaimer">{{ msg }}</p>
-          }
-          @if (trError(); as err) {
-            <div class="alert alert-error">
-              <mat-icon>error_outline</mat-icon>
-              <p>{{ err }}</p>
-            </div>
-          }
-        </section>
-      } @else {
-        <div class="origen-row">
-          <p class="disclaimer">Sesión de Trade Republic activa.</p>
-          <button class="btn-ghost" type="button" (click)="trSalir()">
-            <mat-icon>logout</mat-icon>
-            Desconectar
-          </button>
-        </div>
-
-        @if (cargandoCartera()) {
-          <div class="loading" role="status">
-            <mat-icon class="spin">sync</mat-icon>
-            <p>Leyendo tu cartera en Trade Republic…</p>
-          </div>
-        } @else {
-            @if (trCartera(); as c) {
-            <section class="kpis" aria-label="Resumen de la cuenta">
-              @for (e of c.efectivo; track e.moneda) {
-                <article class="kpi">
-                  <span>Efectivo ({{ e.moneda }})</span>
-                  <strong>{{ e.importe | number: '1.2-2' : 'es' }}</strong>
-                </article>
-              }
-              @if (totalesTr(); as t) {
-                <article class="kpi">
-                  <span>Valor de mercado</span>
-                  <strong>
-                    {{ t.valorMercado | number: '1.2-2' : 'es' }} {{ divisa() }}
-                  </strong>
-                </article>
-                <article class="kpi">
-                  <span>Plusvalía latente</span>
-                  <strong [class.pos]="t.plusvalia >= 0" [class.neg]="t.plusvalia < 0">
-                    {{ t.plusvalia | number: '1.2-2' : 'es' }} {{ divisa() }}
-                  </strong>
-                </article>
-                <article class="kpi">
-                  <span>Rentabilidad</span>
-                  <strong
-                    [class.pos]="(t.plusvaliaPct ?? 0) >= 0"
-                    [class.neg]="(t.plusvaliaPct ?? 0) < 0"
+  @if (resultados().length) {
+    <section class="table-section" aria-label="Resultados">
+      <h2>Resultados ({{ resultados().length }})</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Símbolo</th>
+              <th>Nombre</th>
+              <th>Tipo</th>
+              <th>Mercado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of resultados(); track r.simbolo) {
+              <tr>
+                <td><strong>{{ r.simbolo }}</strong></td>
+                <td>{{ r.nombre }}</td>
+                <td>{{ r.tipoTexto ?? r.tipo }}</td>
+                <td>{{ r.mercado ?? '—' }}</td>
+                <td>
+                  <button
+                    class="btn-ghost"
+                    type="button"
+                    (click)="abrirFicha(r.simbolo)"
                   >
-                    {{ formatPct(t.plusvaliaPct) }}
-                  </strong>
-                </article>
-                <article
-                  class="kpi"
-                  matTooltip="Se calcula con las compras importadas, porque el export de Trade Republic no trae la fecha de cada compra"
-                >
-                  <span>Rentabilidad anual</span>
-                  <strong
-                    [class.pos]="(serieCartera()?.anualPct ?? 0) > 0"
-                    [class.neg]="(serieCartera()?.anualPct ?? 0) < 0"
-                  >
-                    {{ formatPct(serieCartera()?.anualPct) }}
-                  </strong>
-                </article>
-              }
-            </section>
-
-            @if (c.cambioAplicado !== 1) {
-              <p class="disclaimer">
-                Trade Republic da el coste en {{ c.divisaCuenta }} y se ha pasado
-                a {{ divisa() }} con el cambio de hoy
-                ({{ c.cambioAplicado | number: '1.4-4' : 'es' }}), porque su
-                export no incluye la fecha de cada compra.
-              </p>
+                    Ver ficha
+                  </button>
+                </td>
+              </tr>
             }
-
-            <section class="table-section" aria-label="Posiciones en Trade Republic">
-              <h2>Posiciones ({{ c.posiciones.length }})</h2>
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Activo</th>
-                      <th class="num">Títulos</th>
-                      <th class="num">Precio medio</th>
-                      <th class="num">Precio actual</th>
-                      <th class="num">Día</th>
-                      <th class="num">Valor</th>
-                      <th class="num">Plusvalía</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (p of c.posiciones; track p.isin) {
-                      <tr>
-                        <td class="name-cell">
-                          <strong>{{ p.nombre }}</strong>
-                          <span class="cat">{{ p.isin }}</span>
-                        </td>
-                        <td class="num">{{ p.acciones | number: '1.0-6' : 'es' }}</td>
-                        <td class="num">{{ p.precioMedio | number: '1.2-2' : 'es' }}</td>
-                        <td class="num">
-                          @if (p.precioActual != null) {
-                            {{ p.precioActual | number: '1.2-2' : 'es' }}
-                          } @else {
-                            —
-                          }
-                        </td>
-                        <td
-                          class="num"
-                          [class.pos]="(p.variacionDiaPct ?? 0) > 0"
-                          [class.neg]="(p.variacionDiaPct ?? 0) < 0"
-                        >
-                          {{ formatPct(p.variacionDiaPct) }}
-                        </td>
-                        <td class="num">
-                          @if (p.valorMercado != null) {
-                            {{ p.valorMercado | number: '1.2-2' : 'es' }}
-                          } @else {
-                            —
-                          }
-                        </td>
-                        <td
-                          class="num"
-                          [class.pos]="(p.plusvalia ?? 0) >= 0"
-                          [class.neg]="(p.plusvalia ?? 0) < 0"
-                        >
-                          @if (p.plusvalia != null) {
-                            {{ p.plusvalia | number: '1.2-2' : 'es' }}
-                          } @else {
-                            —
-                          }
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-              <p class="disclaimer">
-                El precio medio y el coste los da Trade Republic en euros; el precio
-                actual viene de Yahoo Finance en {{ divisa() }}.
-              </p>
-            </section>
-            }
-        }
-      }
-    }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  } @else if (busquedaHecha() && !buscando()) {
+    <div class="empty">
+      <mat-icon>search_off</mat-icon>
+      <p>Sin resultados. Prueba con el ISIN o el ticker exacto.</p>
+    </div>
   }
 
-  <!-- ==================== BOLSA ==================== -->
-  @if (pestana() === 'bolsa') {
-    <section class="buscador" aria-label="Buscar fondos, ETFs y acciones">
-      <div class="form-row">
-        <label class="field grow">
-          <span>Buscar por ISIN, ticker o nombre</span>
-          <input
-            type="search"
-            placeholder="IE00B4L5Y983, EUNL.DE, MSCI World…"
-            [ngModel]="consulta()"
-            (ngModelChange)="consulta.set($event)"
-            (keyup.enter)="buscar()"
-          />
-        </label>
-        <button
-          class="btn-primary"
-          type="button"
-          [disabled]="buscando()"
-          (click)="buscar()"
-        >
-          <mat-icon>{{ buscando() ? 'hourglass_top' : 'search' }}</mat-icon>
-          {{ buscando() ? 'Buscando…' : 'Buscar' }}
+  @if (cargandoFicha()) {
+    <div class="loading" role="status">
+      <mat-icon class="spin">sync</mat-icon>
+      <p>Cargando ficha…</p>
+    </div>
+  }
+
+  @if (errorFicha(); as err) {
+    <div class="alert alert-error">
+      <mat-icon>error_outline</mat-icon>
+      <p>{{ err }}</p>
+    </div>
+  }
+
+  @if (ficha(); as f) {
+    <section class="ficha" aria-label="Ficha del activo">
+      <header class="ficha-header">
+        <div>
+          <h2>{{ f.yahoo.nombre ?? f.cotizacion.nombre ?? f.simbolo }}</h2>
+          <p class="cat">
+            {{ f.simbolo }}
+            @if (f.isin) {
+              · {{ f.isin }}
+            }
+            @if (f.yahoo.mercado) {
+              · {{ f.yahoo.mercado }}
+            }
+            @if (f.yahoo.tipo) {
+              · {{ f.yahoo.tipo }}
+            }
+          </p>
+        </div>
+        <button class="icon-btn" type="button" (click)="cerrarFicha()" matTooltip="Cerrar">
+          <mat-icon>close</mat-icon>
         </button>
+      </header>
+
+      <div class="precio-row">
+        <strong class="precio">
+          @if (f.cotizacion.precioBase != null) {
+            {{ f.cotizacion.precioBase | number: '1.2-2' : 'es' }} {{ f.cotizacion.divisaBase }}
+          } @else {
+            —
+          }
+        </strong>
+        <span
+          class="var"
+          [class.pos]="(f.cotizacion.variacionDiaPct ?? 0) > 0"
+          [class.neg]="(f.cotizacion.variacionDiaPct ?? 0) < 0"
+        >
+          {{ formatPct(f.cotizacion.variacionDiaPct) }} hoy
+        </span>
+        @if (f.cotizacion.moneda && f.cotizacion.moneda !== f.cotizacion.divisaBase) {
+          <span class="cat">
+            Cotiza en {{ f.cotizacion.moneda }}:
+            {{ f.cotizacion.precio | number: '1.2-2' : 'es' }}
+          </span>
+        }
       </div>
 
-      @if (errorBusqueda(); as err) {
-        <div class="alert alert-error">
-          <mat-icon>error_outline</mat-icon>
-          <p>{{ err }}</p>
-        </div>
-      }
-    </section>
-
-    @if (resultados().length) {
-      <section class="table-section" aria-label="Resultados">
-        <h2>Resultados ({{ resultados().length }})</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Símbolo</th>
-                <th>Nombre</th>
-                <th>Tipo</th>
-                <th>Mercado</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (r of resultados(); track r.simbolo) {
-                <tr>
-                  <td><strong>{{ r.simbolo }}</strong></td>
-                  <td>{{ r.nombre }}</td>
-                  <td>{{ r.tipoTexto ?? r.tipo }}</td>
-                  <td>{{ r.mercado ?? '—' }}</td>
-                  <td>
-                    <button
-                      class="btn-ghost"
-                      type="button"
-                      (click)="abrirFicha(r.simbolo)"
-                    >
-                      Ver ficha
-                    </button>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      </section>
-    } @else if (busquedaHecha() && !buscando()) {
-      <div class="empty">
-        <mat-icon>search_off</mat-icon>
-        <p>Sin resultados. Prueba con el ISIN o el ticker exacto.</p>
-      </div>
-    }
-
-    @if (cargandoFicha()) {
-      <div class="loading" role="status">
-        <mat-icon class="spin">sync</mat-icon>
-        <p>Cargando ficha…</p>
-      </div>
-    }
-
-    @if (errorFicha(); as err) {
-      <div class="alert alert-error">
-        <mat-icon>error_outline</mat-icon>
-        <p>{{ err }}</p>
-      </div>
-    }
-
-    @if (ficha(); as f) {
-      <section class="ficha" aria-label="Ficha del activo">
-        <header class="ficha-header">
-          <div>
-            <h2>{{ f.yahoo.nombre ?? f.cotizacion.nombre ?? f.simbolo }}</h2>
-            <p class="cat">
-              {{ f.simbolo }}
-              @if (f.isin) {
-                · {{ f.isin }}
-              }
-              @if (f.yahoo.mercado) {
-                · {{ f.yahoo.mercado }}
-              }
-              @if (f.yahoo.tipo) {
-                · {{ f.yahoo.tipo }}
-              }
-            </p>
-          </div>
-          <button class="icon-btn" type="button" (click)="cerrarFicha()" matTooltip="Cerrar">
-            <mat-icon>close</mat-icon>
+      <div class="rangos">
+        @for (r of rangos; track r.valor) {
+          <button
+            type="button"
+            class="preset-chip"
+            [class.active]="rango() === r.valor"
+            [disabled]="cargandoHistorico()"
+            (click)="cambiarRango(r.valor)"
+          >
+            {{ r.etiqueta }}
           </button>
-        </header>
+        }
+        @if (variacionHistorico() != null) {
+          <span
+            class="var"
+            [class.pos]="(variacionHistorico() ?? 0) >= 0"
+            [class.neg]="(variacionHistorico() ?? 0) < 0"
+          >
+            {{ formatPct(variacionHistorico()) }} en el periodo
+          </span>
+        }
+      </div>
 
-        <div class="precio-row">
-          <strong class="precio">
-            @if (f.cotizacion.precioBase != null) {
-              {{ f.cotizacion.precioBase | number: '1.2-2' : 'es' }} {{ f.cotizacion.divisaBase }}
+      @if (lineaHistorico(); as linea) {
+        <svg
+          class="sparkline"
+          viewBox="0 0 100 32"
+          preserveAspectRatio="none"
+          role="img"
+          [attr.aria-label]="'Evolución del precio en ' + rango()"
+        >
+          <polyline
+            [attr.points]="linea"
+            [class.neg]="(variacionHistorico() ?? 0) < 0"
+          />
+        </svg>
+      } @else if (!cargandoHistorico()) {
+        <p class="disclaimer">Sin histórico disponible para este activo.</p>
+      }
+
+      <dl class="metrics">
+        <div>
+          <dt>TER</dt>
+          <dd>
+            @if (terFicha() != null) {
+              {{ terFicha() | number: '1.2-2' : 'es' }} %
             } @else {
               —
             }
-          </strong>
-          <span
-            class="var"
-            [class.pos]="(f.cotizacion.variacionDiaPct ?? 0) > 0"
-            [class.neg]="(f.cotizacion.variacionDiaPct ?? 0) < 0"
-          >
-            {{ formatPct(f.cotizacion.variacionDiaPct) }} hoy
-          </span>
-          @if (f.cotizacion.moneda && f.cotizacion.moneda !== f.cotizacion.divisaBase) {
-            <span class="cat">
-              Cotiza en {{ f.cotizacion.moneda }}:
-              {{ f.cotizacion.precio | number: '1.2-2' : 'es' }}
-            </span>
-          }
+          </dd>
         </div>
-
-        <div class="rangos">
-          @for (r of rangos; track r.valor) {
-            <button
-              type="button"
-              class="preset-chip"
-              [class.active]="rango() === r.valor"
-              [disabled]="cargandoHistorico()"
-              (click)="cambiarRango(r.valor)"
-            >
-              {{ r.etiqueta }}
-            </button>
-          }
-          @if (variacionHistorico() != null) {
-            <span
-              class="var"
-              [class.pos]="(variacionHistorico() ?? 0) >= 0"
-              [class.neg]="(variacionHistorico() ?? 0) < 0"
-            >
-              {{ formatPct(variacionHistorico()) }} en el periodo
-            </span>
-          }
+        <div>
+          <dt>Categoría</dt>
+          <dd>{{ categoriaFicha() ?? '—' }}</dd>
         </div>
-
-        @if (lineaHistorico(); as linea) {
-          <svg
-            class="sparkline"
-            viewBox="0 0 100 32"
-            preserveAspectRatio="none"
-            role="img"
-            [attr.aria-label]="'Evolución del precio en ' + rango()"
-          >
-            <polyline
-              [attr.points]="linea"
-              [class.neg]="(variacionHistorico() ?? 0) < 0"
-            />
-          </svg>
-        } @else if (!cargandoHistorico()) {
-          <p class="disclaimer">Sin histórico disponible para este activo.</p>
+        <div>
+          <dt>Gestora</dt>
+          <dd>{{ f.yahoo.gestora ?? '—' }}</dd>
+        </div>
+        <div>
+          <dt>Patrimonio</dt>
+          <dd>{{ formatPatrimonio(f.yahoo.patrimonio) }}</dd>
+        </div>
+        <div>
+          <dt>YTD</dt>
+          <dd>{{ formatPct(f.yahoo.rentabilidadYtdPct) }}</dd>
+        </div>
+        <div>
+          <dt>3 años (anual.)</dt>
+          <dd>{{ formatPct(f.yahoo.rentabilidad3aPct) }}</dd>
+        </div>
+        <div>
+          <dt>5 años (anual.)</dt>
+          <dd>{{ formatPct(f.yahoo.rentabilidad5aPct) }}</dd>
+        </div>
+        <div>
+          <dt>Dividendo</dt>
+          <dd>{{ formatPct(f.yahoo.dividendoPct) }}</dd>
+        </div>
+        <div>
+          <dt>Beta</dt>
+          <dd>{{ f.yahoo.beta != null ? (f.yahoo.beta | number: '1.2-2' : 'es') : '—' }}</dd>
+        </div>
+        @if (f.morningstar.indiceReferencia) {
+          <div class="wide">
+            <dt>Índice Morningstar</dt>
+            <dd>{{ f.morningstar.indiceReferencia }}</dd>
+          </div>
         }
+      </dl>
 
-        <dl class="metrics">
-          <div>
-            <dt>TER</dt>
-            <dd>
-              @if (terFicha() != null) {
-                {{ terFicha() | number: '1.2-2' : 'es' }} %
-              } @else {
-                —
-              }
-            </dd>
-          </div>
-          <div>
-            <dt>Categoría</dt>
-            <dd>{{ categoriaFicha() ?? '—' }}</dd>
-          </div>
-          <div>
-            <dt>Gestora</dt>
-            <dd>{{ f.yahoo.gestora ?? '—' }}</dd>
-          </div>
-          <div>
-            <dt>Patrimonio</dt>
-            <dd>{{ formatPatrimonio(f.yahoo.patrimonio) }}</dd>
-          </div>
-          <div>
-            <dt>YTD</dt>
-            <dd>{{ formatPct(f.yahoo.rentabilidadYtdPct) }}</dd>
-          </div>
-          <div>
-            <dt>3 años (anual.)</dt>
-            <dd>{{ formatPct(f.yahoo.rentabilidad3aPct) }}</dd>
-          </div>
-          <div>
-            <dt>5 años (anual.)</dt>
-            <dd>{{ formatPct(f.yahoo.rentabilidad5aPct) }}</dd>
-          </div>
-          <div>
-            <dt>Dividendo</dt>
-            <dd>{{ formatPct(f.yahoo.dividendoPct) }}</dd>
-          </div>
-          <div>
-            <dt>Beta</dt>
-            <dd>{{ f.yahoo.beta != null ? (f.yahoo.beta | number: '1.2-2' : 'es') : '—' }}</dd>
-          </div>
-          @if (f.morningstar.indiceReferencia) {
-            <div class="wide">
-              <dt>Índice Morningstar</dt>
-              <dd>{{ f.morningstar.indiceReferencia }}</dd>
-            </div>
-          }
-        </dl>
+      @if (f.yahoo.principalesPosiciones; as holdings) {
+        <section class="composicion">
+          <h3>Principales posiciones</h3>
+          <ul class="pesos">
+            @for (h of holdings; track h.simbolo) {
+              <li>
+                <span class="peso-nombre">
+                  <strong>{{ h.simbolo }}</strong> {{ h.nombre }}
+                </span>
+                <span class="peso-barra">
+                  <span [style.width.%]="h.pesoPct"></span>
+                </span>
+                <span class="peso-val">{{ h.pesoPct | number: '1.1-1' : 'es' }} %</span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
 
-        @if (f.yahoo.principalesPosiciones; as holdings) {
-          <section class="composicion">
-            <h3>Principales posiciones</h3>
-            <ul class="pesos">
-              @for (h of holdings; track h.simbolo) {
-                <li>
-                  <span class="peso-nombre">
-                    <strong>{{ h.simbolo }}</strong> {{ h.nombre }}
-                  </span>
-                  <span class="peso-barra">
-                    <span [style.width.%]="h.pesoPct"></span>
-                  </span>
-                  <span class="peso-val">{{ h.pesoPct | number: '1.1-1' : 'es' }} %</span>
-                </li>
-              }
-            </ul>
-          </section>
-        }
+      @if (f.yahoo.sectores; as sectores) {
+        <section class="composicion">
+          <h3>Sectores</h3>
+          <ul class="pesos">
+            @for (s of sectores; track s.nombre) {
+              <li>
+                <span class="peso-nombre">{{ nombreSector(s.nombre) }}</span>
+                <span class="peso-barra">
+                  <span [style.width.%]="s.pesoPct"></span>
+                </span>
+                <span class="peso-val">{{ s.pesoPct | number: '1.1-1' : 'es' }} %</span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
 
-        @if (f.yahoo.sectores; as sectores) {
-          <section class="composicion">
-            <h3>Sectores</h3>
-            <ul class="pesos">
-              @for (s of sectores; track s.nombre) {
-                <li>
-                  <span class="peso-nombre">{{ nombreSector(s.nombre) }}</span>
-                  <span class="peso-barra">
-                    <span [style.width.%]="s.pesoPct"></span>
-                  </span>
-                  <span class="peso-val">{{ s.pesoPct | number: '1.1-1' : 'es' }} %</span>
-                </li>
-              }
-            </ul>
-          </section>
-        }
-
-        @if (f.yahoo.tiposActivo; as tiposActivo) {
-          <section class="composicion">
-            <h3>Tipo de activo</h3>
-            <ul class="pesos">
-              @for (a of tiposActivo; track a.nombre) {
-                <li>
-                  <span class="peso-nombre">{{ nombreSector(a.nombre) }}</span>
-                  <span class="peso-barra">
-                    <span [style.width.%]="a.pesoPct"></span>
-                  </span>
-                  <span class="peso-val">{{ a.pesoPct | number: '1.1-1' : 'es' }} %</span>
-                </li>
-              }
-            </ul>
-          </section>
-        }
-      </section>
-    }
-
-    <p class="attribution">
-      Datos de <a href="https://finance.yahoo.com" target="_blank" rel="noopener">Yahoo Finance</a>
-      y <a href="https://www.morningstar.es" target="_blank" rel="noopener">Morningstar</a>.
-      No es consejo de inversión.
-    </p>
+      @if (f.yahoo.tiposActivo; as tiposActivo) {
+        <section class="composicion">
+          <h3>Tipo de activo</h3>
+          <ul class="pesos">
+            @for (a of tiposActivo; track a.nombre) {
+              <li>
+                <span class="peso-nombre">{{ nombreSector(a.nombre) }}</span>
+                <span class="peso-barra">
+                  <span [style.width.%]="a.pesoPct"></span>
+                </span>
+                <span class="peso-val">{{ a.pesoPct | number: '1.1-1' : 'es' }} %</span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    </section>
   }
+
+  <p class="attribution">
+    Datos de <a href="https://finance.yahoo.com" target="_blank" rel="noopener">Yahoo Finance</a>
+    y <a href="https://www.morningstar.es" target="_blank" rel="noopener">Morningstar</a>.
+    No es consejo de inversión.
+  </p>
 </div>
