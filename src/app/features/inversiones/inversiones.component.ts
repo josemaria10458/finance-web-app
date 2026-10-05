@@ -12,10 +12,11 @@ import { InversionesService } from '../../core/services/inversiones.service';
 import { buildMonthOptions, formatMesLabel } from '../../core/utils/date.utils';
 import { impuestosAPagarDelAnio } from '../../core/utils/irpf-ahorro.utils';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { CarteraComponent } from '../cartera/cartera.component';
 import { CompraFormDialogComponent } from './compra-form-dialog.component';
 import { VentaFormDialogComponent } from './venta-form-dialog.component';
 
-type Vista = 'historico' | 'ventas' | 'meses';
+type Vista = 'cartera' | 'historico' | 'ventas' | 'meses';
 type OrdenCampo = 'fecha' | 'importe';
 type OrdenDir = 'asc' | 'desc';
 
@@ -23,6 +24,7 @@ type OrdenDir = 'asc' | 'desc';
   selector: 'app-inversiones',
   standalone: true,
   imports: [
+    CarteraComponent,
     CurrencyPipe,
     DatePipe,
     DecimalPipe,
