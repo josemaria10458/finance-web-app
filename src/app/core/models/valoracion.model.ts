@@ -27,6 +27,9 @@ export interface BaseProyeccion {
   /** Gasto financiero neto (EBIT − BAI); negativo si la empresa cobra intereses. */
   intereses: number;
   capex: number | null;
+  beneficioNeto: number | null;
+  /** BAI sin extraordinarios − beneficio neto del último ejercicio. */
+  impuestos: number | null;
   acciones: number | null;
   deudaNeta: number | null;
   patrimonio: number | null;
@@ -37,6 +40,8 @@ export interface SupuestosValoracion {
   margenEbit: number;
   tipoImpositivo: number;
   variacionAcciones: number;
+  /** Millones que se suman al capex del primer año proyectado (negativo para reducirlo). */
+  ajusteCapex: number;
   per: number;
   pfcf: number;
   evEbitda: number;

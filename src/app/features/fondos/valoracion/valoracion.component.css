@@ -256,6 +256,54 @@ tr.total td {
   font-weight: 700;
 }
 
+th.real {
+  color: var(--ink);
+}
+
+tr.propio td {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+td.sobre {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.implicito {
+  margin-left: 0.4rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.preset-chip {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  font: 600 0.8rem var(--font-body);
+  cursor: pointer;
+}
+
+.preset-chip.active {
+  background: color-mix(in srgb, var(--accent) 14%, white);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+app-chart-panel {
+  display: block;
+  height: 340px;
+}
+
 .pos {
   color: var(--accent);
 }
