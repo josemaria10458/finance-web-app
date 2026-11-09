@@ -13,10 +13,11 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from . import cartera, morningstar, trade_republic, yahoo
+from . import cartera, morningstar, trade_republic, valoracion, yahoo
 from .cartera import CarteraError
 from .config import BASE_CURRENCY, CORS_ORIGINS, TR_ENABLED
 from .trade_republic import TradeRepublicError
+from .valoracion import ValoracionError
 from .yahoo import YahooError
 
 
@@ -237,6 +238,25 @@ async def instrument(identificador: str) -> dict[str, Any]:
 
 async def _vacio() -> dict[str, Any]:
     return {}
+
+
+@app.get("/valuation/{identificador}")
+async def valuation(identificador: str) -> dict[str, Any]:
+    """Cuentas, ratios y supuestos para valorar una acción por múltiplos."""
+    identificador = identificador.strip()
+    simbolo = identificador
+    if len(identificador) == 12 and identificador[:2].isalpha():
+        resuelto = await yahoo.resolver_isin(identificador.upper())
+        if resuelto is None:
+            raise HTTPException(status_code=404, detail="Activo no encontrado")
+        simbolo = str(resuelto["simbolo"])
+
+    try:
+        return await valoracion.analisis(simbolo)
+    except ValoracionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except YahooError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 class LoteRequest(BaseModel):

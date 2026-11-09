@@ -286,6 +286,10 @@
           </ul>
         </section>
       }
+
+      @if (f.yahoo.tipo === 'EQUITY') {
+        <app-valoracion [simbolo]="f.simbolo" />
+      }
     </section>
   }
 

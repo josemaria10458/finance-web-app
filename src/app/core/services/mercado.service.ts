@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
+  AnalisisValoracion,
   Cotizacion,
   FichaInstrumento,
   HistoricoComparado,
@@ -65,6 +66,16 @@ export class MercadoService {
       }
     }
     return mapa;
+  }
+
+  async valoracion(identificador: string): Promise<AnalisisValoracion> {
+    return this.pedir<AnalisisValoracion>(() =>
+      firstValueFrom(
+        this.http.get<AnalisisValoracion>(
+          `${this.base}/valuation/${encodeURIComponent(identificador)}`
+        )
+      )
+    );
   }
 
   async ficha(identificador: string): Promise<FichaInstrumento> {
