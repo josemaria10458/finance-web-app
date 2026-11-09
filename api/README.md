@@ -29,6 +29,22 @@ registrado: así la serie no se descuadra si el coste venía en otra divisa o si
 Yahoo devuelve el histórico ajustado por splits. El servidor no guarda nada, de
 modo que las compras se envían en cada llamada.
 
+## Valoración por múltiplos
+
+`/valuation/{id}` sustituye a la plantilla de Excel en la que se pegaban a mano
+la cuenta de resultados, el balance, los flujos de caja y el precio de cierre de
+cada ejercicio. Los descarga de Yahoo Finance (4-5 ejercicios), calcula los
+ratios de la hoja «Análisis Ratios» y propone unos supuestos de partida
+(crecimiento, margen EBIT, tipo impositivo, recompras y múltiplos) a partir del
+histórico. La proyección a cinco años y el precio objetivo por PER, P/FCF,
+EV/EBITDA y EV/EBIT se calculan en el navegador para que cambiar un supuesto
+se refleje al momento.
+
+Si la empresa presenta las cuentas en otra divisa que la de cotización, cada
+ejercicio se convierte con el cambio de su fecha de cierre. Bancos y
+aseguradoras no tienen resultado operativo, así que solo se valoran por PER y
+P/FCF.
+
 ## Endpoints
 
 | Método | Ruta | Descripción |
@@ -38,6 +54,7 @@ modo que las compras se envían en cada llamada.
 | GET | `/quotes?ids=` | Cotizaciones en lote (ISIN o símbolo, separados por coma) |
 | GET | `/history/{id}?rango=` | Serie de cierres (`1d`…`max`) |
 | GET | `/instrument/{id}` | Ficha completa: cotización + Yahoo + Morningstar |
+| GET | `/valuation/{id}` | Cuentas anuales, ratios y supuestos para valorar una acción por múltiplos |
 | POST | `/portfolio/history` | Evolución de la cartera y de los índices, en base 100 |
 | POST | `/tr/login` | Paso 1 del acceso a Trade Republic (teléfono + PIN) |
 | POST | `/tr/status` | Estado del login mientras se aprueba en el móvil |

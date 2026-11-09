@@ -12,11 +12,12 @@ import {
   ResultadoBusqueda,
 } from '../../core/models';
 import { MercadoService } from '../../core/services/mercado.service';
+import { ValoracionComponent } from './valoracion/valoracion.component';
 
 @Component({
   selector: 'app-fondos',
   standalone: true,
-  imports: [DecimalPipe, FormsModule, MatIconModule, MatTooltipModule],
+  imports: [DecimalPipe, FormsModule, MatIconModule, MatTooltipModule, ValoracionComponent],
   templateUrl: './fondos.component.html',
   styleUrl: './fondos.component.css',
 })

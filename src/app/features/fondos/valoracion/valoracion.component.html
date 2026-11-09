@@ -1,0 +1,271 @@
+<section class="valoracion" aria-label="Valoración por múltiplos">
+  <header class="cabecera">
+    <div>
+      <h3>Valoración por múltiplos</h3>
+      @if (analisis(); as a) {
+        <p class="sub">
+          Cuentas de los ejercicios {{ a.ejercicios[0] }}–{{ a.ejercicios[a.ejercicios.length - 1] }}
+          · importes en millones de {{ a.divisa }}
+        </p>
+      }
+    </div>
+    @if (analisis()) {
+      <button class="btn-ghost" type="button" (click)="restablecer()" matTooltip="Volver a los supuestos calculados del histórico">
+        <mat-icon>restart_alt</mat-icon>
+        Restablecer supuestos
+      </button>
+    }
+  </header>
+
+  @if (cargando()) {
+    <p class="estado">Descargando cuenta de resultados, balance y flujos de caja…</p>
+  }
+
+  @if (error(); as err) {
+    <p class="estado error">{{ err }}</p>
+  }
+
+  @if (analisis(); as a) {
+    <div class="perfil">
+      @if (a.sector) {
+        <span>{{ a.sector }}</span>
+      }
+      @if (a.industria) {
+        <span>{{ a.industria }}</span>
+      }
+      @if (a.empleados) {
+        <span>{{ a.empleados | number: '1.0-0' : 'es' }} empleados</span>
+      }
+      @if (a.accionesActuales) {
+        <span>{{ a.accionesActuales | number: '1.0-0' : 'es' }} M acciones</span>
+      }
+    </div>
+
+    @if (a.descripcion) {
+      <details class="descripcion">
+        <summary>Descripción del negocio</summary>
+        <p>{{ a.descripcion }}</p>
+      </details>
+    }
+
+    @for (aviso of a.avisos; track aviso) {
+      <p class="aviso"><mat-icon>info</mat-icon>{{ aviso }}</p>
+    }
+
+    <div class="kpis">
+      <div class="kpi">
+        <span>Precio actual</span>
+        <strong>{{ formato(a.precioActual, 'precio') }} {{ a.divisa }}</strong>
+      </div>
+      <div class="kpi main">
+        <span>Precio objetivo medio a 5 años</span>
+        <strong>{{ formato(resultado()?.objetivoMedio5, 'precio') }} {{ a.divisa }}</strong>
+        <small [class.pos]="(potencial() ?? 0) > 0" [class.neg]="(potencial() ?? 0) < 0">
+          {{ formatPct(potencial()) }} sobre el precio actual
+        </small>
+      </div>
+      <div class="kpi">
+        <span>Rentabilidad anual esperada</span>
+        <strong
+          [class.pos]="(resultado()?.cagrMedio5 ?? 0) > 0"
+          [class.neg]="(resultado()?.cagrMedio5 ?? 0) < 0"
+        >
+          {{ formatPct(resultado()?.cagrMedio5) }}
+        </strong>
+        <small>media de los métodos, a 5 años</small>
+      </div>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" class="tab" [class.active]="vista() === 'valoracion'" (click)="setVista('valoracion')">
+        Supuestos y precio objetivo
+      </button>
+      <button type="button" role="tab" class="tab" [class.active]="vista() === 'proyeccion'" (click)="setVista('proyeccion')">
+        Proyección a 5 años
+      </button>
+      <button type="button" role="tab" class="tab" [class.active]="vista() === 'historico'" (click)="setVista('historico')">
+        Análisis de ratios
+      </button>
+    </div>
+
+    @if (vista() === 'valoracion') {
+      <div class="supuestos">
+        <label class="campo">
+          <span>Crecimiento de ventas (anual)</span>
+          <div class="input-sufijo">
+            <input type="number" step="0.5" [ngModel]="pct('crecimiento')" (ngModelChange)="setPct('crecimiento', $event)" />
+            <em>%</em>
+          </div>
+        </label>
+        <label class="campo">
+          <span>{{ a.sinEbit ? 'Margen antes de impuestos' : 'Margen EBIT' }}</span>
+          <div class="input-sufijo">
+            <input type="number" step="0.5" [ngModel]="pct('margenEbit')" (ngModelChange)="setPct('margenEbit', $event)" />
+            <em>%</em>
+          </div>
+        </label>
+        <label class="campo">
+          <span>Tipo impositivo</span>
+          <div class="input-sufijo">
+            <input type="number" step="0.5" [ngModel]="pct('tipoImpositivo')" (ngModelChange)="setPct('tipoImpositivo', $event)" />
+            <em>%</em>
+          </div>
+        </label>
+        <label class="campo">
+          <span>Variación de acciones (anual)</span>
+          <div class="input-sufijo">
+            <input type="number" step="0.25" [ngModel]="pct('variacionAcciones')" (ngModelChange)="setPct('variacionAcciones', $event)" />
+            <em>%</em>
+          </div>
+          <small>Negativo si la empresa recompra acciones.</small>
+        </label>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="izq">Método</th>
+              <th>Múltiplo</th>
+              @for (anio of resultado()?.anios ?? []; track anio.anio) {
+                <th>{{ anio.anio }}</th>
+              }
+              <th>CAGR 3 años</th>
+              <th>CAGR 5 años</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (m of metodosAplicables(); track m.clave) {
+              <tr>
+                <td class="izq">
+                  <strong>{{ m.etiqueta }}</strong>
+                  <small class="ref">
+                    Bajo {{ a.referencias[m.clave].bajo }} · Medio {{ a.referencias[m.clave].medio }}
+                    · Alto {{ a.referencias[m.clave].alto }} · Bolsas {{ a.referencias[m.clave].mediaBolsas }}
+                    @if (historicoMultiplos()[m.clave]; as h) {
+                      · Histórico {{ formato(h, 'veces') }}
+                    }
+                  </small>
+                </td>
+                <td>
+                  <input
+                    class="multiplo"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    [attr.aria-label]="'Múltiplo ' + m.etiqueta"
+                    [ngModel]="multiplo(m.clave)"
+                    (ngModelChange)="setMultiplo(m.clave, $event)"
+                  />
+                </td>
+                @for (anio of resultado()?.anios ?? []; track anio.anio) {
+                  <td>{{ formato(anio.objetivos[m.clave], 'precio') }}</td>
+                }
+                <td [class.pos]="(resultado()?.cagr3?.[m.clave] ?? 0) > 0" [class.neg]="(resultado()?.cagr3?.[m.clave] ?? 0) < 0">
+                  {{ formatPct(resultado()?.cagr3?.[m.clave]) }}
+                </td>
+                <td [class.pos]="(resultado()?.cagr5?.[m.clave] ?? 0) > 0" [class.neg]="(resultado()?.cagr5?.[m.clave] ?? 0) < 0">
+                  {{ formatPct(resultado()?.cagr5?.[m.clave]) }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="nota">
+        Precio objetivo por acción en {{ a.divisa }}. Por PER y P/FCF se suma la caja neta; por EV/EBITDA y
+        EV/EBIT se resta la deuda neta. Cada año la mitad del flujo de caja libre reduce la deuda.
+        Los múltiplos dependen mucho del sector: compáralos con el histórico de la propia empresa.
+      </p>
+    }
+
+    @if (vista() === 'proyeccion') {
+      @if (resultado(); as r) {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="izq">Millones de {{ a.divisa }}, salvo por acción</th>
+                @for (anio of r.anios; track anio.anio) {
+                  <th>{{ anio.anio }}e</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="izq">Ventas</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.ventas, 'importe') }}</td>}</tr>
+              <tr class="secundaria"><td class="izq">Crecimiento</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.crecimiento, 'pct') }}</td>}</tr>
+              @if (!a.sinEbit) {
+                <tr><td class="izq">EBITDA</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.ebitda, 'importe') }}</td>}</tr>
+                <tr class="secundaria"><td class="izq">Margen EBITDA</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.margenEbitda, 'pct') }}</td>}</tr>
+                <tr><td class="izq">Amortizaciones</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.amortizaciones, 'importe') }}</td>}</tr>
+                <tr><td class="izq">EBIT</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.ebit, 'importe') }}</td>}</tr>
+                <tr class="secundaria"><td class="izq">Margen EBIT</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.margenEbit, 'pct') }}</td>}</tr>
+                <tr><td class="izq">Gasto financiero neto</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.intereses, 'importe') }}</td>}</tr>
+              }
+              <tr><td class="izq">Beneficio antes de impuestos</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.bai, 'importe') }}</td>}</tr>
+              <tr><td class="izq">Impuestos</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.impuestos, 'importe') }}</td>}</tr>
+              <tr class="total"><td class="izq">Beneficio neto</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.beneficioNeto, 'importe') }}</td>}</tr>
+              <tr class="secundaria"><td class="izq">Margen neto</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.margenNeto, 'pct') }}</td>}</tr>
+              <tr><td class="izq">Acciones diluidas (M)</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.acciones, 'numero') }}</td>}</tr>
+              <tr class="total"><td class="izq">BPA</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.bpa, 'precio') }}</td>}</tr>
+              <tr><td class="izq">Capex</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.capex, 'importe') }}</td>}</tr>
+              <tr class="total"><td class="izq">Flujo de caja libre</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.fcl, 'importe') }}</td>}</tr>
+              <tr><td class="izq">FCF por acción</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.fclPorAccion, 'precio') }}</td>}</tr>
+              <tr><td class="izq">Deuda neta (− si es caja neta)</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.deudaNeta, 'importe') }}</td>}</tr>
+              @if (!a.sinEbit) {
+                <tr class="secundaria"><td class="izq">Deuda neta / EBITDA</td>@for (x of r.anios; track x.anio) {<td>{{ formato(x.deudaNetaEbitda, 'veces') }}</td>}</tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <p class="nota">
+          Las ventas, las amortizaciones y el capex crecen al ritmo supuesto; el gasto financiero se mantiene en el del
+          último ejercicio. Flujo de caja libre = EBITDA − capex − intereses − impuestos.
+        </p>
+      } @else {
+        <p class="estado">Faltan datos (ventas, acciones o precio) para proyectar esta empresa.</p>
+      }
+    }
+
+    @if (vista() === 'historico') {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="izq">Ejercicio</th>
+              @for (anio of a.ejercicios; track anio) {
+                <th>{{ anio }}</th>
+              }
+              <th>Var. anual</th>
+              <th>CAGR</th>
+            </tr>
+          </thead>
+          @for (g of a.grupos; track g.titulo) {
+            <tbody>
+              <tr class="grupo">
+                <th class="izq" [attr.colspan]="a.ejercicios.length + 3">{{ g.titulo }}</th>
+              </tr>
+              @for (fila of g.filas; track fila.clave) {
+                <tr>
+                  <td class="izq">{{ fila.etiqueta }}</td>
+                  @for (v of fila.valores; track $index) {
+                    <td [class.neg]="(v ?? 0) < 0 && fila.formato !== 'importe'">{{ formato(v, fila.formato) }}</td>
+                  }
+                  <td [class.pos]="(fila.varAnual ?? 0) > 0" [class.neg]="(fila.varAnual ?? 0) < 0">{{ formatPct(fila.varAnual) }}</td>
+                  <td [class.pos]="(fila.cagr ?? 0) > 0" [class.neg]="(fila.cagr ?? 0) < 0">{{ formatPct(fila.cagr) }}</td>
+                </tr>
+              }
+            </tbody>
+          }
+        </table>
+      </div>
+      <p class="nota">
+        Precio al cierre de cada ejercicio fiscal. Deuda neta = deuda total − caja − inversiones a corto plazo.
+        El ROIC usa un tipo impositivo del {{ formato(a.tipoRoic, 'pct') }}.
+        @if (a.divisaEstados !== a.divisa) {
+          Cuentas convertidas de {{ a.divisaEstados }} a {{ a.divisa }} con el cambio de cada cierre.
+        }
+      </p>
+    }
+  }
+</section>
