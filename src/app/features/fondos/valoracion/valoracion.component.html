@@ -80,6 +80,9 @@
       <button type="button" role="tab" class="tab" [class.active]="vista() === 'valoracion'" (click)="setVista('valoracion')">
         Supuestos y precio objetivo
       </button>
+      <button type="button" role="tab" class="tab" [class.active]="vista() === 'futura'" (click)="setVista('futura')">
+        Valoración futura
+      </button>
       <button type="button" role="tab" class="tab" [class.active]="vista() === 'proyeccion'" (click)="setVista('proyeccion')">
         Proyección a 5 años
       </button>
@@ -118,6 +121,14 @@
             <em>%</em>
           </div>
           <small>Negativo si la empresa recompra acciones.</small>
+        </label>
+        <label class="campo">
+          <span>Ajuste de capex del primer año</span>
+          <div class="input-sufijo">
+            <input type="number" step="1" [ngModel]="supuestos()?.ajusteCapex ?? 0" (ngModelChange)="setAjusteCapex($event)" />
+            <em>M</em>
+          </div>
+          <small>Millones de {{ a.divisa }}; negativo para reducir el capex futuro.</small>
         </label>
       </div>
 
@@ -177,6 +188,133 @@
         EV/EBIT se resta la deuda neta. Cada año la mitad del flujo de caja libre reduce la deuda.
         Los múltiplos dependen mucho del sector: compáralos con el histórico de la propia empresa.
       </p>
+    }
+
+    @if (vista() === 'futura') {
+      @if (resultado(); as r) {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="izq">Valoración a precio actual ({{ formato(a.precioActual, 'precio') }} {{ a.divisa }})</th>
+                @for (x of aniosFuturos(); track x.anio) {
+                  <th [class.real]="x.real">{{ x.anio }}{{ x.real ? '' : 'e' }}</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="izq">Capitalización</td>@for (x of aniosFuturos(); track x.anio) {<td>{{ formato(x.capitalizacion, 'importe') }}</td>}</tr>
+              <tr><td class="izq">Deuda neta (− si es caja neta)</td>@for (x of aniosFuturos(); track x.anio) {<td>{{ formato(x.deudaNeta, 'importe') }}</td>}</tr>
+              @if (!a.sinEbit) {
+                <tr class="secundaria"><td class="izq">Deuda neta / EBITDA</td>@for (x of aniosFuturos(); track x.anio) {<td>{{ formato(x.deudaNetaEbitda, 'veces') }}</td>}</tr>
+                <tr class="total"><td class="izq">Valor empresa (EV)</td>@for (x of aniosFuturos(); track x.anio) {<td>{{ formato(x.ev, 'importe') }}</td>}</tr>
+                <tr><td class="izq">EBITDA</td>@for (x of aniosFuturos(); track x.anio) {<td>{{ formato(x.ebitda, 'importe') }}</td>}</tr>
+                <tr><td class="izq">EBIT</td>@for (x of aniosFuturos(); track x.anio) {<td>{{ formato(x.ebit, 'importe') }}</td>}</tr>
+              }
+              <tr><td class="izq">Beneficio neto</td>@for (x of aniosFuturos(); track x.anio) {<td>{{ formato(x.beneficioNeto, 'importe') }}</td>}</tr>
+              <tr><td class="izq">Flujo de caja libre</td>@for (x of aniosFuturos(); track x.anio) {<td>{{ formato(x.fcl, 'importe') }}</td>}</tr>
+              @for (m of metodosAplicables(); track m.clave) {
+                <tr class="secundaria">
+                  <td class="izq">{{ m.etiqueta }} implícito</td>
+                  @for (x of aniosFuturos(); track x.anio) {<td>{{ formato(x.implicitos[m.clave], 'veces') }}</td>}
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <p class="nota">
+          Lo que pagas hoy por los resultados de cada año: la capitalización usa el precio actual y las acciones proyectadas.
+          Si el múltiplo implícito baja con los años, el precio actual descuenta menos crecimiento del que supones.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="izq">Escenario</th>
+                <th>Múltiplo</th>
+                @for (x of aniosFuturos(); track x.anio) {
+                  <th [class.real]="x.real">{{ x.anio }}{{ x.real ? '' : 'e' }}</th>
+                }
+                <th>Potencial 5 años</th>
+                <th>CAGR 3 años</th>
+                <th>CAGR 5 años</th>
+              </tr>
+            </thead>
+            @for (bloque of bloquesFuturos(); track bloque.metodo) {
+              <tbody>
+                <tr class="grupo">
+                  <th class="izq" [attr.colspan]="aniosFuturos().length + 5">
+                    {{ bloque.etiqueta }}
+                    <span class="implicito">· hoy cotiza a {{ formato(bloque.implicitoHoy, 'veces') }}</span>
+                  </th>
+                </tr>
+                @for (fila of bloque.filas; track fila.escenario) {
+                  <tr [class.propio]="fila.escenario === 'propio'">
+                    <td class="izq">{{ fila.etiqueta }}</td>
+                    <td>
+                      @if (fila.escenario === 'propio') {
+                        <input
+                          class="multiplo"
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          [attr.aria-label]="'Múltiplo ' + bloque.etiqueta"
+                          [ngModel]="multiplo(bloque.metodo)"
+                          (ngModelChange)="setMultiplo(bloque.metodo, $event)"
+                        />
+                      } @else {
+                        {{ formato(fila.multiplo, 'veces') }}
+                      }
+                    </td>
+                    @for (v of fila.valoracion.objetivos; track $index) {
+                      <td [class.sobre]="(v ?? 0) > (a.precioActual ?? 0)">{{ formato(v, 'precio') }}</td>
+                    }
+                    <td [class.pos]="(fila.valoracion.potencial5 ?? 0) > 0" [class.neg]="(fila.valoracion.potencial5 ?? 0) < 0">
+                      {{ formatPct(fila.valoracion.potencial5) }}
+                    </td>
+                    <td [class.pos]="(fila.valoracion.cagr3 ?? 0) > 0" [class.neg]="(fila.valoracion.cagr3 ?? 0) < 0">
+                      {{ formatPct(fila.valoracion.cagr3) }}
+                    </td>
+                    <td [class.pos]="(fila.valoracion.cagr5 ?? 0) > 0" [class.neg]="(fila.valoracion.cagr5 ?? 0) < 0">
+                      {{ formatPct(fila.valoracion.cagr5) }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            }
+          </table>
+        </div>
+        <p class="nota">
+          Precio objetivo por acción en {{ a.divisa }} para cada año, con el múltiplo de cada escenario. Bajo, medio, alto
+          y media de bolsas son las referencias de la plantilla; «histórico» es la mediana de la propia empresa en los
+          ejercicios disponibles. En verde, los años en los que el objetivo supera el precio actual. Los supuestos de
+          crecimiento y márgenes se cambian en la pestaña «Supuestos y precio objetivo».
+        </p>
+
+        <div class="presets" role="group" aria-label="Escenario del gráfico">
+          @for (e of escenarios; track e.clave) {
+            <button
+              type="button"
+              class="preset-chip"
+              [class.active]="escenarioGrafico() === e.clave"
+              (click)="escenarioGrafico.set(e.clave)"
+            >
+              {{ e.etiqueta }}
+            </button>
+          }
+        </div>
+        @if (datosGrafico(); as datos) {
+          <app-chart-panel
+            title="Evolución del precio objetivo"
+            type="line"
+            [config]="datos"
+            [options]="opcionesGrafico"
+          />
+        }
+      } @else {
+        <p class="estado">Faltan datos (ventas, acciones o precio) para valorar esta empresa a futuro.</p>
+      }
     }
 
     @if (vista() === 'proyeccion') {

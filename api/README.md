@@ -40,6 +40,13 @@ histórico. La proyección a cinco años y el precio objetivo por PER, P/FCF,
 EV/EBITDA y EV/EBIT se calculan en el navegador para que cambiar un supuesto
 se refleje al momento.
 
+La pestaña «Valoración futura» reproduce la hoja «Futuro Valoración»: la
+capitalización y el EV al precio de hoy para cada año proyectado (y los
+múltiplos implícitos), y el precio objetivo de cada año con cada múltiplo en
+los escenarios bajo, medio, alto y media de bolsas de la plantilla, más el
+propio del usuario y la mediana histórica de la empresa, con su potencial y su
+CAGR a 3 y 5 años.
+
 Si la empresa presenta las cuentas en otra divisa que la de cotización, cada
 ejercicio se convierte con el cambio de su fecha de cierre. Bancos y
 aseguradoras no tienen resultado operativo, así que solo se valoran por PER y

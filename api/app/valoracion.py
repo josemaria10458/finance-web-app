@@ -458,6 +458,9 @@ async def _construir(simbolo: str) -> dict[str, Any]:
             "ebit": bai_sin_extra[-1] if sin_ebit else ebit[-1],
             "intereses": 0.0 if sin_ebit else intereses[-1] or 0.0,
             "capex": abs(capex[-1]) if capex[-1] is not None else None,
+            "beneficioNeto": beneficio_neto[-1],
+            # Como en la plantilla: todo lo que separa el BAI del beneficio neto.
+            "impuestos": _resta(bai_sin_extra[-1], beneficio_neto[-1]),
             "acciones": acciones[-1],
             "deudaNeta": deuda_neta[-1],
             "patrimonio": patrimonio[-1],
@@ -503,6 +506,7 @@ def _supuestos(
         "margenEbit": _redondear(_acotar(margen, 0.0, 0.6), 0.005),
         "tipoImpositivo": _redondear(_acotar(tipo, 0.0, 0.35), 0.005),
         "variacionAcciones": _redondear(_acotar(variacion_acciones, -0.05, 0.05), 0.0025),
+        "ajusteCapex": 0.0,
         "per": multiplo("per", 16),
         "pfcf": multiplo("pfcf", 16),
         "evEbitda": multiplo("evEbitda", 10),

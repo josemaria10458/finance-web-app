@@ -3,6 +3,7 @@ import { Component, computed, effect, inject, input, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { ChartConfiguration } from 'chart.js';
 import {
   AnalisisValoracion,
   FormatoFila,
@@ -11,11 +12,38 @@ import {
 } from '../../../core/models';
 import { MercadoService } from '../../../core/services/mercado.service';
 import {
+  ESCENARIOS_MULTIPLO,
+  EscenarioMultiplo,
   METODOS_VALORACION,
+  ValoracionEscenario,
   proyectarValoracion,
+  valorarEscenario,
 } from '../../../core/utils/valoracion.utils';
+import { ChartPanelComponent } from '../../../shared/charts/chart-panel.component';
 
-type Vista = 'valoracion' | 'proyeccion' | 'historico';
+type Vista = 'valoracion' | 'futura' | 'proyeccion' | 'historico';
+
+interface FilaEscenario {
+  escenario: EscenarioMultiplo;
+  etiqueta: string;
+  multiplo: number;
+  valoracion: ValoracionEscenario;
+}
+
+interface BloqueMetodo {
+  metodo: MetodoValoracion;
+  etiqueta: string;
+  /** Múltiplo al que cotiza hoy respecto a los resultados del último ejercicio. */
+  implicitoHoy: number | null;
+  filas: FilaEscenario[];
+}
+
+const COLORES_METODO: Record<MetodoValoracion, string> = {
+  per: '#1f6f66',
+  pfcf: '#c9793b',
+  evEbitda: '#5b7fb5',
+  evEbit: '#9a5bb5',
+};
 
 /** Supuestos que se introducen en porcentaje y se guardan como fracción. */
 type SupuestoPct = 'crecimiento' | 'margenEbit' | 'tipoImpositivo' | 'variacionAcciones';
@@ -23,7 +51,7 @@ type SupuestoPct = 'crecimiento' | 'margenEbit' | 'tipoImpositivo' | 'variacionA
 @Component({
   selector: 'app-valoracion',
   standalone: true,
-  imports: [DecimalPipe, FormsModule, MatIconModule, MatTooltipModule],
+  imports: [ChartPanelComponent, DecimalPipe, FormsModule, MatIconModule, MatTooltipModule],
   templateUrl: './valoracion.component.html',
   styleUrl: './valoracion.component.css',
 })
@@ -73,6 +101,94 @@ export class ValoracionComponent {
     }
     return salida;
   });
+
+  readonly escenarios = ESCENARIOS_MULTIPLO;
+  /** Escenario de múltiplos que se dibuja en el gráfico de valoración futura. */
+  readonly escenarioGrafico = signal<EscenarioMultiplo>('propio');
+
+  /** Ejercicio real seguido de los cinco proyectados. */
+  readonly aniosFuturos = computed(() => {
+    const r = this.resultado();
+    return r ? [r.actual, ...r.anios] : [];
+  });
+
+  /**
+   * Hoja «Futuro Valoración»: precio objetivo de cada año con cada múltiplo y
+   * escenario, su potencial frente al precio de hoy y la rentabilidad anual.
+   */
+  readonly bloquesFuturos = computed<BloqueMetodo[]>(() => {
+    const a = this.analisis();
+    const r = this.resultado();
+    if (!a || !r || a.precioActual == null) return [];
+    const precio = a.precioActual;
+    return this.metodosAplicables().map(({ clave, etiqueta }) => ({
+      metodo: clave,
+      etiqueta,
+      implicitoHoy: r.actual.implicitos[clave],
+      filas: this.escenarios.flatMap(({ clave: escenario, etiqueta: nombre }) => {
+        const multiplo = this.multiploEscenario(clave, escenario);
+        if (multiplo == null) return [];
+        return [{
+          escenario,
+          etiqueta: nombre,
+          multiplo,
+          valoracion: valorarEscenario(r, clave, multiplo, precio, a.sinEbit),
+        }];
+      }),
+    }));
+  });
+
+  readonly datosGrafico = computed<ChartConfiguration['data'] | null>(() => {
+    const a = this.analisis();
+    const anios = this.aniosFuturos();
+    if (!a || !anios.length || a.precioActual == null) return null;
+    const escenario = this.escenarioGrafico();
+    const series = this.bloquesFuturos().flatMap((bloque) => {
+      const fila = bloque.filas.find((f) => f.escenario === escenario);
+      if (!fila) return [];
+      const color = COLORES_METODO[bloque.metodo];
+      return [{
+        label: `${bloque.etiqueta} ${this.formato(fila.multiplo, 'veces')}`,
+        data: fila.valoracion.objetivos,
+        borderColor: color,
+        backgroundColor: color,
+        borderWidth: 2,
+        pointRadius: 3,
+        tension: 0.2,
+      }];
+    });
+    return {
+      labels: anios.map((x) => (x.real ? `${x.anio}` : `${x.anio}e`)),
+      datasets: [
+        ...series,
+        {
+          label: 'Precio actual',
+          data: anios.map(() => a.precioActual),
+          borderColor: '#8a8f8d',
+          backgroundColor: '#8a8f8d',
+          borderDash: [6, 4],
+          borderWidth: 1.5,
+          pointRadius: 0,
+        },
+      ],
+    };
+  });
+
+  readonly opcionesGrafico: ChartConfiguration['options'] = {
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
+      tooltip: {
+        callbacks: {
+          label: (item) => {
+            const valor = item.parsed.y;
+            if (valor == null) return `${item.dataset.label}: —`;
+            return `${item.dataset.label}: ${this.formato(valor, 'precio')}`;
+          },
+        },
+      },
+    },
+  };
 
   private peticion = 0;
 
@@ -124,6 +240,22 @@ export class ValoracionComponent {
   setMultiplo(clave: MetodoValoracion, valor: number | null): void {
     if (valor == null || Number.isNaN(valor) || valor < 0) return;
     this.supuestos.update((s) => (s ? { ...s, [clave]: valor } : s));
+  }
+
+  multiploEscenario(metodo: MetodoValoracion, escenario: EscenarioMultiplo): number | null {
+    switch (escenario) {
+      case 'propio':
+        return this.supuestos()?.[metodo] ?? null;
+      case 'historico':
+        return this.historicoMultiplos()[metodo] ?? null;
+      default:
+        return this.analisis()?.referencias[metodo]?.[escenario] ?? null;
+    }
+  }
+
+  setAjusteCapex(valor: number | null): void {
+    if (valor == null || Number.isNaN(valor)) return;
+    this.supuestos.update((s) => (s ? { ...s, ajusteCapex: valor } : s));
   }
 
   restablecer(): void {
