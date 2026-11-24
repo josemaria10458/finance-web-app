@@ -30,6 +30,25 @@ function normalizaTexto(value: string): string {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
+interface GrupoPosicion {
+  key: string;
+  empresa: string;
+  isin?: string;
+  lotes: OperacionBolsa[];
+  acciones: number;
+  precioMedio: number;
+}
+
+function claveActivo(op: OperacionBolsa): string {
+  return op.isin?.trim().toUpperCase() || normalizaTexto(op.empresa);
+}
+
+function precioMedioPonderado(ops: OperacionBolsa[]): number {
+  const acciones = ops.reduce((s, o) => s + o.numeroAcciones, 0);
+  if (acciones <= 0) return 0;
+  return ops.reduce((s, o) => s + o.precioCompraAccion * o.numeroAcciones, 0) / acciones;
+}
+
 @Component({
   selector: 'app-venta-form-dialog',
   standalone: true,
@@ -52,49 +71,43 @@ function normalizaTexto(value: string): string {
               type="search"
               [value]="filtroNombre()"
               (input)="onFiltro($event)"
-              placeholder="Filtrar por nombre"
+              placeholder="Filtrar por nombre o ISIN"
               autocomplete="off"
             />
           </label>
           <div class="field">
-            <span>Posiciones</span>
-            <div class="pos-toolbar">
-              <p class="pos-hint">
-                Puedes marcar varias: se registran como una sola venta con el
-                total.
-              </p>
-              @if (abiertasFiltradas().length > 1) {
-                <button type="button" class="link-btn" (click)="marcarTodas()">
-                  Todas
-                </button>
-              }
-            </div>
-            <div class="pos-list" role="group" aria-label="Posiciones a vender">
-              @for (op of abiertasFiltradas(); track op.id) {
-                <label class="pos-item" [class.on]="estaSeleccionada(op.id)">
+            <span>Acción a vender</span>
+            <div class="pos-list" role="radiogroup" aria-label="Acción a vender">
+              @for (g of gruposFiltrados(); track g.key) {
+                <label class="pos-item" [class.on]="grupoActivo() === g.key">
                   <input
-                    type="checkbox"
-                    [checked]="estaSeleccionada(op.id)"
-                    (change)="togglePosicion(op.id)"
+                    type="radio"
+                    name="grupo-venta"
+                    [checked]="grupoActivo() === g.key"
+                    (change)="seleccionarGrupo(g.key)"
                   />
                   <span class="pos-copy">
-                    <strong>{{ op.empresa }}</strong>
+                    <strong>{{ g.empresa }}</strong>
                     <small>
-                      {{ op.numeroAcciones | number: '1.0-4' }} acc. ·
-                      {{ op.fechaOperacion | date: 'dd/MM/yyyy' }} ·
-                      {{ costeDe(op) | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}
+                      {{ g.acciones | number: '1.0-4' }} acc. ·
+                      {{ g.lotes.length === 1 ? 'compra a' : 'precio medio' }}
+                      {{ g.precioMedio | currency: divisa() : 'symbol' : '1.2-4' : 'es' }}
+                      @if (g.lotes.length > 1) {
+                        · {{ g.lotes.length }} compras
+                      }
                     </small>
                   </span>
                 </label>
               }
-              @if (!abiertasFiltradas().length && abiertas().length) {
-                <p class="pos-empty">Ninguna posición coincide con la búsqueda.</p>
+              @if (!gruposFiltrados().length && abiertas().length) {
+                <p class="pos-empty">Ninguna acción coincide con la búsqueda.</p>
               }
               <label class="pos-item" [class.on]="esIndependiente()">
                 <input
-                  type="checkbox"
+                  type="radio"
+                  name="grupo-venta"
                   [checked]="esIndependiente()"
-                  (change)="togglePosicion(posicionNueva)"
+                  (change)="seleccionarGrupo(posicionNueva)"
                 />
                 <span class="pos-copy">
                   <strong>Sin compra registrada</strong>
@@ -103,33 +116,50 @@ function normalizaTexto(value: string): string {
               </label>
             </div>
           </div>
-        }
 
-        @if (seleccionadas().length === 1 && !esIndependiente()) {
-          <p class="context">
-            <strong>{{ seleccionadas()[0].empresa }}</strong>
-            · {{ seleccionadas()[0].numeroAcciones | number: '1.0-4' }} acciones ·
-            coste
-            {{
-              costeDe(seleccionadas()[0])
-                | currency: divisa() : 'symbol' : '1.2-2' : 'es'
-            }}
-          </p>
-        }
-
-        @if (seleccionadas().length > 1) {
-          <p class="context">
-            <strong>1 venta unificada</strong>
-            · {{ seleccionadas().length }} posiciones ·
-            {{ totalAcciones() | number: '1.0-4' }} acciones · total
-            {{ totalVenta() | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}
-          </p>
-          @if (empresasDistintas()) {
-            <p class="warn">
-              Hay empresas distintas: el mismo precio por acción se aplicará a
-              todas.
-            </p>
+          @if (lotesGrupoActivo().length > 1) {
+            <div class="field">
+              <span>Compras incluidas en la venta</span>
+              <div class="pos-list lotes" role="group" aria-label="Compras incluidas">
+                @for (op of lotesGrupoActivo(); track op.id) {
+                  <label class="pos-item" [class.on]="estaSeleccionada(op.id)">
+                    <input
+                      type="checkbox"
+                      [checked]="estaSeleccionada(op.id)"
+                      (change)="toggleLote(op.id)"
+                    />
+                    <span class="pos-copy">
+                      <strong>
+                        {{ op.fechaOperacion | date: 'dd/MM/yyyy' }} ·
+                        {{ op.numeroAcciones | number: '1.0-4' }} acc.
+                      </strong>
+                      <small>
+                        a {{ op.precioCompraAccion | currency: divisa() : 'symbol' : '1.2-4' : 'es' }}
+                        · coste {{ costeDe(op) | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}
+                      </small>
+                    </span>
+                  </label>
+                }
+              </div>
+            </div>
           }
+        }
+
+        @if (seleccionadas().length && !esIndependiente()) {
+          <div class="compra-resumen">
+            <div>
+              <span>{{ seleccionadas().length === 1 ? 'Precio de compra' : 'Precio medio de compra' }}</span>
+              <strong>{{ precioMedioCompra() | currency: divisa() : 'symbol' : '1.2-4' : 'es' }}</strong>
+            </div>
+            <div>
+              <span>Acciones</span>
+              <strong>{{ totalAcciones() | number: '1.0-4' }}</strong>
+            </div>
+            <div>
+              <span>Coste total</span>
+              <strong>{{ totalCoste() | currency: divisa() : 'symbol' : '1.2-2' : 'es' }}</strong>
+            </div>
+          </div>
         }
 
         @if (esIndependiente()) {
@@ -263,19 +293,31 @@ function normalizaTexto(value: string): string {
     </mat-dialog-actions>
   `,
   styles: `
-    .context {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.9rem;
+    .compra-resumen {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.6rem;
+      padding: 0.8rem 0.9rem;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(12, 46, 43, 0.03);
     }
-    .context strong {
+    .compra-resumen span {
+      display: block;
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin-bottom: 0.15rem;
+    }
+    .compra-resumen strong {
+      font-variant-numeric: tabular-nums;
+      font-size: 0.98rem;
       color: var(--ink);
     }
-    .warn {
-      margin: 0;
-      color: #8a5a12;
-      font-size: 0.82rem;
-      line-height: 1.4;
+    .pos-list.lotes {
+      max-height: 160px;
     }
     .form {
       display: flex;
@@ -298,32 +340,6 @@ function normalizaTexto(value: string): string {
       letter-spacing: 0.04em;
       text-transform: uppercase;
       color: var(--muted);
-    }
-    .pos-toolbar {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 0.5rem;
-    }
-    .pos-hint {
-      margin: 0;
-      font-size: 0.78rem;
-      font-weight: 500;
-      letter-spacing: 0;
-      text-transform: none;
-      color: var(--muted);
-      line-height: 1.35;
-    }
-    .link-btn {
-      border: 0;
-      background: transparent;
-      color: var(--accent);
-      font-size: 0.78rem;
-      font-weight: 700;
-      cursor: pointer;
-      font-family: var(--font-body);
-      padding: 0;
-      white-space: nowrap;
     }
     .pos-list {
       display: flex;
@@ -441,7 +457,8 @@ function normalizaTexto(value: string): string {
       color: var(--danger);
     }
     @media (max-width: 480px) {
-      .grid-2 {
+      .grid-2,
+      .compra-resumen {
         grid-template-columns: 1fr;
       }
     }
@@ -462,31 +479,56 @@ export class VentaFormDialogComponent {
   readonly fija = Boolean(this.data.operacion);
   readonly abiertas = this.inversionesService.abiertas;
 
-  readonly abiertasOrdenadas = computed(() =>
-    [...this.abiertas()].sort(
-      (a, b) =>
-        a.empresa.localeCompare(b.empresa, 'es') ||
-        a.fechaOperacion.localeCompare(b.fechaOperacion)
-    )
-  );
+  /** Compras abiertas agrupadas por activo, con precio medio ponderado. */
+  readonly grupos = computed((): GrupoPosicion[] => {
+    const map = new Map<string, OperacionBolsa[]>();
+    for (const op of this.abiertas()) {
+      const key = claveActivo(op);
+      const list = map.get(key) ?? [];
+      list.push(op);
+      map.set(key, list);
+    }
+    return [...map.entries()]
+      .map(([key, lotes]) => {
+        lotes.sort((a, b) => a.fechaOperacion.localeCompare(b.fechaOperacion));
+        const acciones = lotes.reduce((s, o) => s + o.numeroAcciones, 0);
+        return {
+          key,
+          empresa: lotes[0].empresa,
+          isin: lotes[0].isin,
+          lotes,
+          acciones,
+          precioMedio: precioMedioPonderado(lotes),
+        };
+      })
+      .sort((a, b) => a.empresa.localeCompare(b.empresa, 'es'));
+  });
 
   readonly filtroNombre = signal('');
 
-  readonly abiertasFiltradas = computed(() => {
+  readonly gruposFiltrados = computed(() => {
     const q = normalizaTexto(this.filtroNombre());
-    const list = this.abiertasOrdenadas();
+    const list = this.grupos();
     if (!q) return list;
-    return list.filter((o) => normalizaTexto(o.empresa).includes(q));
+    return list.filter(
+      (g) =>
+        normalizaTexto(g.empresa).includes(q) ||
+        normalizaTexto(g.isin ?? '').includes(q)
+    );
   });
 
-  private readonly inicialIds: string[] = this.data.operacion?.id
-    ? [this.data.operacion.id]
-    : this.inversionesService.abiertas()[0]
-      ? [this.inversionesService.abiertas()[0].id]
-      : [POSICION_NUEVA];
+  /** Clave del activo elegido, o POSICION_NUEVA para venta sin compra. */
+  readonly grupoActivo = signal<string | null>(
+    this.data.operacion ? claveActivo(this.data.operacion) : null
+  );
+
+  readonly lotesGrupoActivo = computed(() => {
+    const key = this.grupoActivo();
+    return this.grupos().find((g) => g.key === key)?.lotes ?? [];
+  });
 
   readonly form = this.fb.nonNullable.group({
-    posicionIds: [this.inicialIds],
+    posicionIds: [this.data.operacion?.id ? [this.data.operacion.id] : ([] as string[])],
     empresa: ['', [Validators.maxLength(80)]],
     fechaOperacion: [todayIso(), Validators.required],
     fechaVenta: [todayIso(), Validators.required],
@@ -537,10 +579,9 @@ export class VentaFormDialogComponent {
     return precio * this.totalAcciones();
   });
 
-  readonly empresasDistintas = computed(() => {
-    const names = new Set(this.seleccionadas().map((o) => o.empresa));
-    return names.size > 1;
-  });
+  readonly precioMedioCompra = computed(() =>
+    precioMedioPonderado(this.seleccionadas())
+  );
 
   readonly preview = computed(() => {
     this.formTick();
@@ -593,30 +634,29 @@ export class VentaFormDialogComponent {
     return this.esIndependiente() || this.seleccionadas().length > 0;
   }
 
-  togglePosicion(id: string): void {
-    const current = this.form.controls.posicionIds.value;
-    if (id === POSICION_NUEVA) {
-      this.form.controls.posicionIds.setValue(
-        current.includes(POSICION_NUEVA) ? [] : [POSICION_NUEVA]
-      );
+  /** Elegir un activo selecciona todas sus compras abiertas (y solo esas). */
+  seleccionarGrupo(key: string): void {
+    this.grupoActivo.set(key);
+    if (key === POSICION_NUEVA) {
+      this.form.controls.posicionIds.setValue([POSICION_NUEVA]);
       return;
     }
-    const sinNueva = current.filter((x) => x !== POSICION_NUEVA);
-    const next = sinNueva.includes(id)
-      ? sinNueva.filter((x) => x !== id)
-      : [...sinNueva, id];
-    this.form.controls.posicionIds.setValue(next);
+    const grupo = this.grupos().find((g) => g.key === key);
+    this.form.controls.posicionIds.setValue(grupo?.lotes.map((o) => o.id) ?? []);
+  }
+
+  toggleLote(id: string): void {
+    const current = this.form.controls.posicionIds.value.filter(
+      (x) => x !== POSICION_NUEVA
+    );
+    this.form.controls.posicionIds.setValue(
+      current.includes(id) ? current.filter((x) => x !== id) : [...current, id]
+    );
   }
 
   onFiltro(event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     this.filtroNombre.set(value);
-  }
-
-  marcarTodas(): void {
-    this.form.controls.posicionIds.setValue(
-      this.abiertasFiltradas().map((o) => o.id)
-    );
   }
 
   guardar(): void {

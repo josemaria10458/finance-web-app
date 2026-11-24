@@ -7,6 +7,7 @@ import { Gasto } from '../models/gasto.model';
 import { Ingreso } from '../models/ingreso.model';
 import { OperacionBolsa } from '../models/operacion-bolsa.model';
 import { MovimientoRecurrente } from '../models/recurrente.model';
+import { UltimaImportacion } from '../models/ultima-importacion.model';
 import {
   doc,
   getDoc,
@@ -34,6 +35,7 @@ export interface UserDataSnapshot {
   categoriasConfig: CategoriasConfig;
   filtroAnio: number | null;
   initialSetupCompleted: boolean;
+  ultimaImportacion?: UltimaImportacion | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -242,8 +244,23 @@ export class UserFirestoreService {
           ? (raw['filtroAnio'] as number)
           : null,
       initialSetupCompleted,
+      ultimaImportacion: normalizeUltimaImportacion(raw['ultimaImportacion']),
     };
   }
+}
+
+function normalizeUltimaImportacion(raw: unknown): UltimaImportacion | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r['desde'] !== 'string' || typeof r['hasta'] !== 'string') {
+    return null;
+  }
+  return {
+    desde: r['desde'],
+    hasta: r['hasta'],
+    importadoEl: typeof r['importadoEl'] === 'string' ? r['importadoEl'] : '',
+    fileName: typeof r['fileName'] === 'string' ? r['fileName'] : '',
+  };
 }
 
 /** Firestore rechaza `undefined` (y NaN) en documentos; se omiten antes de escribir. */

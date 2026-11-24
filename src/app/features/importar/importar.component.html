@@ -9,6 +9,25 @@
     </div>
   </header>
 
+  @if (!preview() && !result() && ultimaImportacion(); as u) {
+    <section class="rango-banner rango-last" aria-live="polite">
+      <mat-icon class="rango-icon">event_available</mat-icon>
+      <div class="rango-body">
+        <span class="rango-label">Tus datos importados llegan hasta el</span>
+        <strong class="rango-hasta">{{ u.hasta | date: "d 'de' MMMM 'de' y" : '' : 'es' }}</strong>
+        <span class="rango-meta">
+          {{ antiguedad(u.hasta) }}
+          @if (u.importadoEl) {
+            · importado el {{ u.importadoEl | date: 'dd/MM/yyyy HH:mm' : '' : 'es' }}
+          }
+          @if (u.fileName) {
+            · {{ u.fileName }}
+          }
+        </span>
+      </div>
+    </section>
+  }
+
   <div
     class="dropzone"
     [class.active]="dragOver()"
@@ -81,6 +100,20 @@
           </button>
         </div>
       </div>
+
+      @if (rangoPreview(); as r) {
+        <div class="rango-banner">
+          <mat-icon class="rango-icon">event</mat-icon>
+          <div class="rango-body">
+            <span class="rango-label">Este archivo tiene datos hasta el</span>
+            <strong class="rango-hasta">{{ r.hasta | date: "d 'de' MMMM 'de' y" : '' : 'es' }}</strong>
+            <span class="rango-meta">
+              Desde el {{ r.desde | date: 'dd/MM/yyyy' }} · último movimiento
+              {{ antiguedad(r.hasta) }}
+            </span>
+          </div>
+        </div>
+      }
 
       <div class="counts">
         <div class="count-gastos">
@@ -225,6 +258,19 @@
   @if (result(); as r) {
     <section class="result">
       <h2>Importación completada</h2>
+      @if (r.rango; as rango) {
+        <div class="rango-banner rango-done">
+          <mat-icon class="rango-icon">check_circle</mat-icon>
+          <div class="rango-body">
+            <span class="rango-label">Datos actualizados hasta el</span>
+            <strong class="rango-hasta">{{ rango.hasta | date: "d 'de' MMMM 'de' y" : '' : 'es' }}</strong>
+            <span class="rango-meta">
+              Desde el {{ rango.desde | date: 'dd/MM/yyyy' }} · último movimiento
+              {{ antiguedad(rango.hasta) }}
+            </span>
+          </div>
+        </div>
+      }
       <div class="counts">
         <div><span>Gastos</span><strong>{{ r.gastos }}</strong></div>
         <div><span>Ingresos</span><strong>{{ r.ingresos }}</strong></div>

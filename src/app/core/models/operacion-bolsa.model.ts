@@ -23,6 +23,28 @@ export interface OperacionBolsa {
   origenIds?: string[];
   /** Esta compra se vendió dentro de la venta con este id. */
   consolidadaEnId?: string;
+  /**
+   * Huella de la fila original del archivo importado. Se conserva cuando la
+   * operación se divide o se edita para que reimportar no la duplique.
+   */
+  claveImport?: string;
+}
+
+/** Dos operaciones con la misma clave son la misma fila del archivo importado. */
+export function claveImportOperacion(o: OperacionBolsa): string {
+  if (o.claveImport) return o.claveImport;
+  return [
+    o.empresa,
+    o.isin ?? '',
+    o.fechaOperacion,
+    o.inversion,
+    o.precioCompraAccion,
+    o.numeroAcciones,
+    o.comision,
+    o.precioVentaAccion ?? '',
+    o.fechaVenta ?? '',
+    o.esVenta === true,
+  ].join('|');
 }
 
 export type OperacionBolsaInput = Omit<

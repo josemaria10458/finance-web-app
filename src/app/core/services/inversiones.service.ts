@@ -4,9 +4,11 @@ import {
   MovimientoInversionMes,
   OperacionBolsa,
   OperacionBolsaInput,
+  claveImportOperacion,
   costeOperacion,
   normalizeRentabilidadPct,
 } from '../models';
+import { conciliarVentas } from '../utils/conciliar-ventas.utils';
 import { todayIso } from '../utils/date.utils';
 import {
   ImportMergeResult,
@@ -21,22 +23,6 @@ import {
 } from '../utils/inversion-mensual.utils';
 import { xirrFromIso } from '../utils/xirr.utils';
 import { UserFirestoreService } from './user-firestore.service';
-
-/** Dos operaciones con la misma clave son la misma fila del archivo importado. */
-function claveOperacion(o: OperacionBolsa): string {
-  return [
-    o.empresa,
-    o.isin ?? '',
-    o.fechaOperacion,
-    o.inversion,
-    o.precioCompraAccion,
-    o.numeroAcciones,
-    o.comision,
-    o.precioVentaAccion ?? '',
-    o.fechaVenta ?? '',
-    o.esVenta === true,
-  ].join('|');
-}
 
 /**
  * Flujos de caja para XIRR según el libro del Excel:
@@ -202,7 +188,12 @@ export class InversionesService {
   }
 
   hydrate(operaciones: OperacionBolsa[]): void {
-    this._operaciones.set(operaciones);
+    const conciliadas = conciliarVentas(operaciones);
+    if (conciliadas.cambios) {
+      this.persist(conciliadas.operaciones);
+    } else {
+      this._operaciones.set(operaciones);
+    }
   }
 
   addCompra(
@@ -403,6 +394,67 @@ export class InversionesService {
     return 1;
   }
 
+  /**
+   * Corrige precio de compra/venta de una venta y recalcula inversión,
+   * resultado y rentabilidad. En ventas consolidadas, los lotes de origen
+   * se escalan en la misma proporción para que XIRR y meses sigan cuadrando.
+   */
+  updatePreciosVenta(
+    id: string,
+    precioCompraAccion: number,
+    precioVentaAccion: number
+  ): OperacionBolsa | null {
+    const current = this._operaciones();
+    const prev = current.find((o) => o.id === id);
+    if (
+      !prev ||
+      prev.consolidadaEnId ||
+      (!prev.esVenta && prev.precioVentaAccion == null)
+    ) {
+      return null;
+    }
+
+    const factor =
+      prev.precioCompraAccion > 0
+        ? precioCompraAccion / prev.precioCompraAccion
+        : null;
+    const escalarInversion = (o: OperacionBolsa): number =>
+      factor != null ? o.inversion * factor : precioCompraAccion * o.numeroAcciones;
+
+    const inversion = escalarInversion(prev);
+    const coste = costeOperacion({ inversion, comision: prev.comision });
+    const resultadoNeto =
+      precioVentaAccion * prev.numeroAcciones -
+      coste -
+      (prev.provisionImpuestos ?? 0);
+    const rentabilidadPct = coste > 0 ? (resultadoNeto / coste) * 100 : 0;
+
+    const updated: OperacionBolsa = {
+      ...prev,
+      claveImport: claveImportOperacion(prev),
+      precioCompraAccion,
+      precioVentaAccion,
+      inversion,
+      resultadoNeto,
+      rentabilidadPct,
+    };
+
+    const origen = new Set(prev.origenIds ?? []);
+    const next = current.map((o) => {
+      if (o.id === id) return updated;
+      if (!origen.has(o.id) || o.consolidadaEnId !== id) return o;
+      return {
+        ...o,
+        claveImport: claveImportOperacion(o),
+        precioCompraAccion:
+          factor != null ? o.precioCompraAccion * factor : precioCompraAccion,
+        inversion: escalarInversion(o),
+      };
+    });
+    this.persist(next);
+    return updated;
+  }
+
   remove(id: string): void {
     const next = this._operaciones()
       .filter((o) => o.id !== id)
@@ -466,7 +518,7 @@ export class InversionesService {
     });
 
     const actuales = this._operaciones();
-    const nuevos = registrosNuevos(actuales, candidatos, claveOperacion);
+    const nuevos = registrosNuevos(actuales, candidatos, claveImportOperacion);
     if (nuevos.length) {
       this.persist([...nuevos, ...actuales]);
     }
@@ -477,6 +529,7 @@ export class InversionesService {
   }
 
   private persist(operaciones: OperacionBolsa[]): void {
+    operaciones = conciliarVentas(operaciones).operaciones;
     this._operaciones.set(operaciones);
     if (this.uid) {
       void this.firestore.patch(this.uid, { operaciones });

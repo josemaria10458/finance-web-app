@@ -4,6 +4,7 @@ import {
   GastoInput,
   IngresoInput,
   OperacionBolsaInput,
+  RangoImportacion,
 } from '../models';
 import { parseFlexibleDate } from '../utils/date.utils';
 import { clasificarGastoExcel, contarColumnasGastoExcel, esColumnaGastoExcel } from '../utils/gasto-categorias.utils';
@@ -15,6 +16,24 @@ import { CategoriasConfigService } from './categorias-config.service';
 import { GastosService } from './gastos.service';
 import { IngresosService } from './ingresos.service';
 import { InversionesService } from './inversiones.service';
+import { UltimaImportacionService } from './ultima-importacion.service';
+
+/** Fecha más antigua y más reciente entre los movimientos del archivo. */
+export function rangoDeImportacion(
+  preview: Pick<ImportPreview, 'gastos' | 'ingresos' | 'operaciones'>
+): RangoImportacion | null {
+  const fechas = [
+    ...preview.gastos.map((g) => g.fecha),
+    ...preview.ingresos.map((i) => i.fecha),
+    ...preview.operaciones.flatMap((o) => [o.fechaOperacion, o.fechaVenta]),
+  ].filter((f): f is string => typeof f === 'string' && /^\d{4}-\d{2}-\d{2}/.test(f));
+  if (!fechas.length) return null;
+  fechas.sort();
+  return {
+    desde: fechas[0].slice(0, 10),
+    hasta: fechas[fechas.length - 1].slice(0, 10),
+  };
+}
 
 export interface ImportIssue {
   sheet: string;
@@ -29,6 +48,7 @@ export interface ImportResult {
   /** Filas que ya estaban guardadas y no se han vuelto a añadir. */
   omitidos: number;
   issues: ImportIssue[];
+  rango: RangoImportacion | null;
 }
 
 export interface ImportPreview {
@@ -48,6 +68,9 @@ export class ImportService {
   private readonly ingresosService = inject(IngresosService);
   private readonly inversionesService = inject(InversionesService);
   private readonly categoriasConfig = inject(CategoriasConfigService);
+  private readonly ultimaImportacionService = inject(UltimaImportacionService);
+
+  readonly ultimaImportacion = this.ultimaImportacionService.ultima;
 
   private get catConfig() {
     return this.categoriasConfig.config();
@@ -66,12 +89,21 @@ export class ImportService {
     const gastos = this.gastosService.importMany(preview.gastos);
     const ingresos = this.ingresosService.importMany(preview.ingresos);
     const operaciones = this.inversionesService.importMany(preview.operaciones);
+    const rango = rangoDeImportacion(preview);
+    if (rango) {
+      this.ultimaImportacionService.save({
+        ...rango,
+        importadoEl: new Date().toISOString(),
+        fileName: preview.fileName,
+      });
+    }
     return {
       gastos: gastos.importados,
       ingresos: ingresos.importados,
       operaciones: operaciones.importados,
       omitidos: gastos.omitidos + ingresos.omitidos + operaciones.omitidos,
       issues: preview.issues,
+      rango,
     };
   }
 

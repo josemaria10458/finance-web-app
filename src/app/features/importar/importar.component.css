@@ -97,6 +97,63 @@
   max-width: 60ch;
 }
 
+.rango-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(31, 111, 102, 0.25);
+  border-left: 5px solid var(--accent);
+  background: rgba(31, 111, 102, 0.07);
+}
+
+.rango-banner.rango-done {
+  background: rgba(31, 111, 102, 0.12);
+}
+
+.rango-icon {
+  flex-shrink: 0;
+  font-size: 32px;
+  width: 32px;
+  height: 32px;
+  color: var(--accent);
+}
+
+.rango-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.rango-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.rango-hasta {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.rango-meta {
+  font-size: 0.86rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .rango-hasta {
+    font-size: 1.3rem;
+  }
+}
+
 .error {
   margin: 0;
   color: var(--danger);
