@@ -8,6 +8,7 @@ import { GastosService } from './gastos.service';
 import { IngresosService } from './ingresos.service';
 import { InversionesService } from './inversiones.service';
 import { RecurrentesService } from './recurrentes.service';
+import { UltimaImportacionService } from './ultima-importacion.service';
 import {
   UserDataSnapshot,
   UserFirestoreService,
@@ -24,6 +25,7 @@ export class UserSessionService {
   private readonly ingresos = inject(IngresosService);
   private readonly inversiones = inject(InversionesService);
   private readonly recurrentes = inject(RecurrentesService);
+  private readonly ultimaImportacion = inject(UltimaImportacionService);
 
   private lastUid: string | null = null;
   private loadPromise: Promise<void> | null = null;
@@ -92,6 +94,7 @@ export class UserSessionService {
     this.recurrentes.clearUser();
     this.categorias.clearUser();
     this.filtroAnio.clearUser();
+    this.ultimaImportacion.clearUser();
   }
 
   private loadUser(uid: string): void {
@@ -102,6 +105,7 @@ export class UserSessionService {
     this.recurrentes.setUid(uid);
     this.categorias.setUid(uid);
     this.filtroAnio.setUid(uid);
+    this.ultimaImportacion.setUid(uid);
 
     this.loadPromise = this.firestore
       .load(uid)
@@ -115,6 +119,7 @@ export class UserSessionService {
         this.recurrentes.hydrate(dataWithSetup.recurrentes ?? []);
         this.categorias.hydrate(dataWithSetup.categoriasConfig);
         this.filtroAnio.hydrate(dataWithSetup.filtroAnio);
+        this.ultimaImportacion.hydrate(dataWithSetup.ultimaImportacion);
         this.recurrentes.generatePending();
 
         if (
@@ -140,6 +145,7 @@ export class UserSessionService {
         this.recurrentes.setUid(uid);
         this.categorias.setUid(uid);
         this.filtroAnio.setUid(uid);
+        this.ultimaImportacion.setUid(uid);
       })
       .finally(() => {
         if (this.lastUid === uid) {

@@ -7,4 +7,5 @@ export * from './mercado.model';
 export * from './operacion-bolsa.model';
 export * from './recurrente.model';
 export * from './resumen-mensual.model';
+export * from './ultima-importacion.model';
 export * from './valoracion.model';

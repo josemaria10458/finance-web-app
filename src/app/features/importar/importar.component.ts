@@ -14,7 +14,9 @@ import {
   ImportPreview,
   ImportResult,
   ImportService,
+  rangoDeImportacion,
 } from '../../core/services/import.service';
+import { todayIso } from '../../core/utils/date.utils';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import {
   GastoFormDialogComponent,
@@ -55,11 +57,29 @@ export class ImportarComponent {
   readonly error = signal<string | null>(null);
   readonly fileName = signal<string | null>(null);
 
+  readonly ultimaImportacion = this.importService.ultimaImportacion;
+
   readonly previewTotal = computed(() => {
     const p = this.preview();
     if (!p) return 0;
     return p.gastos.length + p.ingresos.length + p.operaciones.length;
   });
+
+  readonly rangoPreview = computed(() => {
+    const p = this.preview();
+    return p ? rangoDeImportacion(p) : null;
+  });
+
+  /** Texto relativo respecto a hoy: «hoy», «ayer», «hace 5 días». */
+  antiguedad(iso: string): string {
+    const dias = Math.round(
+      (Date.parse(todayIso()) - Date.parse(iso.slice(0, 10))) / 86_400_000
+    );
+    if (!Number.isFinite(dias) || dias < 0) return '';
+    if (dias === 0) return 'hoy';
+    if (dias === 1) return 'ayer';
+    return `hace ${dias} días`;
+  }
 
   onFileInput(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -108,9 +128,12 @@ export class ImportarComponent {
       const omitidos = res.omitidos
         ? ` (${res.omitidos} ya estaban guardados)`
         : '';
+      const hasta = res.rango
+        ? ` · datos hasta el ${res.rango.hasta.split('-').reverse().join('/')}`
+        : '';
       this.snackBar.open(
         total
-          ? `Importados ${total} registros${omitidos}`
+          ? `Importados ${total} registros${omitidos}${hasta}`
           : res.omitidos
             ? 'Todos los registros del archivo ya estaban guardados'
             : 'No se importó ningún registro válido',

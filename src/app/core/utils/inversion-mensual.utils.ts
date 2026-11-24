@@ -68,12 +68,9 @@ export function resumenDeMes(
     }
   }
 
-  let rentabilidadPct: number | null = null;
-  if (invertido > 0) {
-    rentabilidadPct = (resultado / invertido) * 100;
-  } else if (costeVentas > 0 && numVentas > 0) {
-    rentabilidadPct = (resultado / costeVentas) * 100;
-  }
+  // Rentabilidad de lo vendido en el mes: las compras del mes no generan resultado aún.
+  const rentabilidadPct =
+    numVentas > 0 && costeVentas > 0 ? (resultado / costeVentas) * 100 : null;
 
   return {
     mesKey: ym,

@@ -14,6 +14,10 @@ import { impuestosAPagarDelAnio } from '../../core/utils/irpf-ahorro.utils';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { CarteraComponent } from '../cartera/cartera.component';
 import { CompraFormDialogComponent } from './compra-form-dialog.component';
+import {
+  EditarPreciosVentaDialogComponent,
+  EditarPreciosVentaResult,
+} from './editar-precios-venta-dialog.component';
 import { VentaFormDialogComponent } from './venta-form-dialog.component';
 
 type Vista = 'cartera' | 'historico' | 'ventas' | 'meses';
@@ -204,6 +208,45 @@ export class InversionesComponent {
       if (!saved) return;
       this.vista.set('ventas');
       this.snackBar.open('Venta registrada', 'Cerrar', { duration: 2500 });
+    });
+  }
+
+  editarPreciosVenta(op: OperacionBolsa): void {
+    const ref = this.dialog.open<
+      EditarPreciosVentaDialogComponent,
+      unknown,
+      EditarPreciosVentaResult
+    >(EditarPreciosVentaDialogComponent, {
+      width: '480px',
+      maxWidth: '94vw',
+      panelClass: 'app-dialog',
+      data: { operacion: op },
+    });
+    ref.afterClosed().subscribe((cambios) => {
+      if (!cambios) return;
+      const confirm = this.dialog.open(ConfirmDialogComponent, {
+        width: '400px',
+        maxWidth: '94vw',
+        panelClass: 'app-dialog',
+        data: {
+          titulo: 'Confirmar cambios',
+          mensaje: `Se actualizarán los precios de «${op.empresa}» y se recalcularán el resultado, la rentabilidad, el resumen mensual y los impuestos.`,
+          confirmarLabel: 'Guardar cambios',
+        },
+      });
+      confirm.afterClosed().subscribe((ok) => {
+        if (!ok) return;
+        const updated = this.inversionesService.updatePreciosVenta(
+          op.id,
+          cambios.precioCompraAccion,
+          cambios.precioVentaAccion
+        );
+        this.snackBar.open(
+          updated ? 'Venta actualizada' : 'No se pudo actualizar la venta',
+          'Cerrar',
+          { duration: 2500 }
+        );
+      });
     });
   }
 
